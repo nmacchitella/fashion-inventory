@@ -1,0 +1,61 @@
+{
+    // Editor Configuration
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "editor.quickSuggestions": {
+      "strings": "on"
+    },
+    "editor.rulers": [100],
+    "editor.tabSize": 2,
+    "editor.wordWrap": "on",
+    
+    // TypeScript Configuration
+    "typescript.preferences.importModuleSpecifier": "non-relative",
+    "typescript.suggest.autoImports": true,
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    
+    // Tailwind CSS Configuration
+    "tailwindCSS.experimental.classRegex": [
+      ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+      ["cn\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+    ],
+    "tailwindCSS.includeLanguages": {
+      "typescript": "javascript",
+      "typescriptreact": "javascript"
+    },
+    
+    // File Associations
+    "files.associations": {
+      "*.css": "tailwindcss",
+      "*.scss": "tailwindcss"
+    },
+    
+    // Prisma Configuration
+    "[prisma]": {
+      "editor.defaultFormatter": "Prisma.prisma"
+    },
+    
+    // Git Configuration
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false,
+    
+    // Path Intelligence
+    "javascript.preferences.importModuleSpecifier": "non-relative",
+    "path-intellisense.mappings": {
+      "@": "${workspaceRoot}/app"
+    },
+    
+    // File Exclusions
+    "files.exclude": {
+      "**/.git": true,
+      "**/.svn": true,
+      "**/.hg": true,
+      "**/CVS": true,
+      "**/.DS_Store": true,
+      "**/node_modules": true
+    }
+  }

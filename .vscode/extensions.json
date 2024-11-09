@@ -1,0 +1,30 @@
+{
+  "recommendations": [
+    // Core Extensions
+    "dbaeumer.vscode-eslint",                 // ESLint
+    "esbenp.prettier-vscode",                 // Prettier
+    "bradlc.vscode-tailwindcss",             // Tailwind CSS IntelliSense
+    "Prisma.prisma",                         // Prisma
+    "ms-vscode.vscode-typescript-next",      // TypeScript Nightly
+    
+    // React/Next.js
+    "dsznajder.es7-react-js-snippets",      // React Snippets
+    "formulahendry.auto-rename-tag",         // Auto Rename Tag
+    
+    // Git
+    "eamodio.gitlens",                      // GitLens
+    "mhutchie.git-graph",                   // Git Graph
+    
+    // Productivity
+    "christian-kohler.path-intellisense",    // Path Intellisense
+    "streetsidesoftware.code-spell-checker", // Code Spell Checker
+    "naumovs.color-highlight",               // Color Highlight
+    "wayou.vscode-todo-highlight",           // TODO Highlight
+    
+    // Testing
+    "Orta.vscode-jest",                     // Jest
+    
+    // Icons
+    "pkief.material-icon-theme"             // Material Icon Theme
+  ]
+}
