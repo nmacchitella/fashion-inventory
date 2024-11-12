@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User and Auth
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -30,38 +23,55 @@ enum Role {
   INVENTORY_MANAGER
 }
 
-// Core business models
 model Material {
-  id          String         @id @default(cuid())
-  type        String
-  color       String
-  brand       String
-  quantity    Float
-  location    String
-  photos      String[]      // URLs to photos
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  styleItems  StyleMaterial[]
+  id                 String              @id @default(cuid())
+  type               String
+  color              String
+  colorCode          String
+  brand              String
+  quantity           Float
+  unit               MeasurementUnit
+  costPerUnit        Float
+  currency           String
+  location           String
+  notes              String?
+  photos             String[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  products           ProductMaterial[] // Changed from styleItems
+  materialOrderItems MaterialOrderItem[] // Added opposite relation field
 }
 
-model Style {
-  id          String         @id @default(cuid())
-  name        String
-  season      String
-  phase       Phase
-  materials   StyleMaterial[]
-  photos      String[]      // URLs to photos
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+enum MeasurementUnit {
+  GRAM
+  KILOGRAM
+  METER
+  YARD
 }
 
-model StyleMaterial {
-  id          String   @id @default(cuid())
-  style       Style    @relation(fields: [styleId], references: [id])
-  styleId     String
-  material    Material @relation(fields: [materialId], references: [id])
-  materialId  String
-  quantity    Float
+model Product {
+  id        String            @id @default(cuid())
+  sku       String            @unique
+  piece     String
+  name      String
+  season    String
+  phase     Phase
+  materials ProductMaterial[]
+  photos    String[]
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model ProductMaterial {
+  id         String          @id @default(cuid())
+  product    Product         @relation(fields: [productId], references: [id])
+  productId  String
+  material   Material        @relation(fields: [materialId], references: [id])
+  materialId String
+  quantity   Float
+  unit       MeasurementUnit
+  notes      String?
 }
 
 enum Phase {
@@ -70,4 +80,63 @@ enum Phase {
   FIT_SAMPLE
   PRODUCTION_SAMPLE
   PRODUCTION
+}
+
+model MaterialOrder {
+  id               String              @id @default(cuid())
+  orderNumber      String              @unique
+  supplier         String
+  orderItems       MaterialOrderItem[]
+  totalPrice       Float
+  currency         String
+  orderDate        DateTime
+  expectedDelivery DateTime
+  actualDelivery   DateTime?
+  status           OrderStatus
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model MaterialOrderItem {
+  id         String          @id @default(cuid())
+  order      MaterialOrder   @relation(fields: [orderId], references: [id])
+  orderId    String
+  material   Material        @relation(fields: [materialId], references: [id])
+  materialId String
+  quantity   Float
+  unit       MeasurementUnit
+  unitPrice  Float
+  totalPrice Float
+  notes      String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model Contact {
+  id        String      @id @default(cuid())
+  name      String
+  email     String      @unique
+  phone     String?
+  company   String?
+  role      String?
+  type      ContactType
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+enum ContactType {
+  SUPPLIER
+  MANUFACTURER
+  CUSTOMER
+  OTHER
 }
