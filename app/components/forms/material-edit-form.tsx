@@ -1,21 +1,24 @@
 "use client";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { Material, MeasurementUnit } from "@/types/material";
 import { useState } from "react";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface MaterialEditFormProps {
   material: Material;
-  onSave: (updatedMaterial: Partial<Material>) => Promise<void>;
-  onDelete?: () => Promise<void>;
+  onSaveSuccess: (updatedMaterial: Material) => void;
+  onDeleteSuccess?: (materialId: string) => Promise<void>; // Update type
   onCancel: () => void;
+  mode?: "edit" | "create";
 }
 
-export function MaterialEditForm({ 
-  material, 
-  onSave, 
-  onDelete, 
-  onCancel 
+export function MaterialEditForm({
+  material,
+  onSaveSuccess,
+  onDeleteSuccess,
+  onCancel,
+  mode = "edit",
 }: MaterialEditFormProps) {
   const [formData, setFormData] = useState({
     type: material.type,
@@ -30,6 +33,7 @@ export function MaterialEditForm({
     notes: material.notes || "",
   });
 
+  const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -38,21 +42,34 @@ export function MaterialEditForm({
     e.preventDefault();
     setIsSaving(true);
     try {
-      await onSave(formData);
+      onSaveSuccess(formData as Material);
+      showToast(
+        `Material ${mode === "create" ? "created" : "updated"} successfully`,
+        "success"
+      );
     } catch (error) {
-      console.error('Error saving material:', error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to save material",
+        "error"
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!onDelete) return;
+    if (!onDeleteSuccess) return;
     setIsDeleting(true);
     try {
-      await onDelete();
+      await onDeleteSuccess(material.id);
+      showToast("Material deleted successfully", "success");
+      onCancel();
     } catch (error) {
-      console.error('Error deleting material:', error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete material",
+        "error"
+      );
+    } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -67,8 +84,11 @@ export function MaterialEditForm({
             <input
               type="text"
               value={formData.type}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, type: e.target.value }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -77,8 +97,11 @@ export function MaterialEditForm({
             <input
               type="text"
               value={formData.brand}
-              onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, brand: e.target.value }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -87,28 +110,46 @@ export function MaterialEditForm({
             <input
               type="text"
               value={formData.color}
-              onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, color: e.target.value }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Color Code</label>
+            <label className="text-sm font-medium text-gray-700">
+              Color Code
+            </label>
             <input
               type="text"
               value={formData.colorCode}
-              onChange={(e) => setFormData(prev => ({ ...prev, colorCode: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, colorCode: e.target.value }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Quantity</label>
+            <label className="text-sm font-medium text-gray-700">
+              Quantity
+            </label>
             <input
               type="number"
               value={formData.quantity}
-              onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseFloat(e.target.value) }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  quantity: parseFloat(e.target.value),
+                }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
+              min="0"
+              step="0.01"
             />
           </div>
 
@@ -116,11 +157,14 @@ export function MaterialEditForm({
             <label className="text-sm font-medium text-gray-700">Unit</label>
             <select
               value={formData.unit}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
-                unit: e.target.value as MeasurementUnit 
-              }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  unit: e.target.value as MeasurementUnit,
+                }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
             >
               {Object.values(MeasurementUnit).map((unit) => (
                 <option key={unit} value={unit}>
@@ -131,32 +175,52 @@ export function MaterialEditForm({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Cost Per Unit</label>
+            <label className="text-sm font-medium text-gray-700">
+              Cost Per Unit
+            </label>
             <input
               type="number"
               value={formData.costPerUnit}
-              onChange={(e) => setFormData(prev => ({ ...prev, costPerUnit: parseFloat(e.target.value) }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  costPerUnit: parseFloat(e.target.value),
+                }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
+              min="0"
+              step="0.01"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Currency</label>
+            <label className="text-sm font-medium text-gray-700">
+              Currency
+            </label>
             <input
               type="text"
               value={formData.currency}
-              onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, currency: e.target.value }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
           <div className="space-y-2 col-span-2">
-            <label className="text-sm font-medium text-gray-700">Location</label>
+            <label className="text-sm font-medium text-gray-700">
+              Location
+            </label>
             <input
               type="text"
               value={formData.location}
-              onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, location: e.target.value }))
+              }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
         </div>
@@ -165,14 +229,16 @@ export function MaterialEditForm({
           <label className="text-sm font-medium text-gray-700">Notes</label>
           <textarea
             value={formData.notes}
-            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, notes: e.target.value }))
+            }
             rows={3}
             className="w-full px-3 py-2 border rounded-md"
           />
         </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
-          {onDelete && (
+          {mode === "edit" && onDeleteSuccess && (
             <button
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
@@ -181,7 +247,7 @@ export function MaterialEditForm({
               Delete Material
             </button>
           )}
-          <div className="flex gap-3">
+          <div className="flex gap-3 ml-auto">
             <button
               type="button"
               onClick={onCancel}
@@ -194,13 +260,19 @@ export function MaterialEditForm({
               disabled={isSaving}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving
+                ? mode === "create"
+                  ? "Creating..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create Material"
+                : "Save Changes"}
             </button>
           </div>
         </div>
       </form>
 
-      {onDelete && (
+      {mode === "edit" && onDeleteSuccess && (
         <ConfirmDialog
           open={showDeleteConfirm}
           onOpenChange={setShowDeleteConfirm}

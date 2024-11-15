@@ -4,6 +4,7 @@ import { MaterialEditForm } from "@/components/forms/material-edit-form";
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
 import { Material } from "@/types/material";
 import { notFound, useRouter } from "next/navigation"; // Add this import
 import { use, useEffect, useState } from "react";
@@ -27,6 +28,7 @@ export default function MaterialPage({
   const resolvedParams = use(params);
   const [material, setMaterial] = useState<Material | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     getMaterial(resolvedParams.materialId).then(setMaterial);
@@ -36,43 +38,15 @@ export default function MaterialPage({
     return <div>Loading...</div>;
   }
 
-  const handleSave = async (updatedMaterial: Partial<Material>) => {
-    try {
-      const response = await fetch(`/api/materials/${material.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedMaterial),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update material");
-      }
-
-      const updated = await response.json();
-      setMaterial(updated);
-      setIsEditDialogOpen(false);
-    } catch (error) {
-      console.error("Error updating material:", error);
-    }
+  // Handlers for successful operations
+  const handleSaveSuccess = (updatedMaterial: Material) => {
+    setMaterial(updatedMaterial);
+    setIsEditDialogOpen(false);
   };
 
-  const handleDelete = async () => {
-    try {
-      const response = await fetch(`/api/materials/${material.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete material");
-      }
-
-      router.push("/inventory"); // Redirect to inventory page after deletion
-      router.refresh(); // Refresh the page data
-    } catch (error) {
-      console.error("Error deleting material:", error);
-    }
+  const handleDeleteSuccess = () => {
+    router.push("/inventory");
+    router.refresh();
   };
 
   const detailItems = [
@@ -136,8 +110,8 @@ export default function MaterialPage({
       >
         <MaterialEditForm
           material={material}
-          onSave={handleSave}
-          onDelete={handleDelete}
+          onSaveSuccess={handleSaveSuccess}
+          onDeleteSuccess={handleDeleteSuccess}
           onCancel={() => setIsEditDialogOpen(false)}
         />
       </DialogComponent>

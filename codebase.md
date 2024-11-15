@@ -157,12 +157,113 @@ next-env.d.ts
 # app/(routes)/contacts/loading.tsx
 
 ```tsx
+export default function InventoryLoading() {
+  return (
+    <div className="w-full h-24 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+    </div>
+  );
+}
 
 ```
 
 # app/(routes)/contacts/page.tsx
 
 ```tsx
+import { ContactsTable } from "@/components/data-tables/contacts-table";
+import { prisma } from "@/lib/prisma";
+import { Contact, ContactType } from "@/types/contact";
+import { Prisma } from "@prisma/client";
+
+// Helper function to map Prisma ContactType to our local ContactType
+function mapContactType(type: Prisma.ContactType): ContactType {
+  switch (type) {
+    case "SUPPLIER":
+      return ContactType.SUPPLIER;
+    case "MANUFACTURER":
+      return ContactType.MANUFACTURER;
+    case "CUSTOMER":
+      return ContactType.CUSTOMER;
+    case "OTHER":
+      return ContactType.OTHER;
+    default:
+      return ContactType.OTHER;
+  }
+}
+
+async function getContacts(): Promise<Contact[]> {
+  if (!prisma) {
+    console.error("Prisma client is not initialized");
+    throw new Error("Database client not initialized");
+  }
+
+  try {
+    // First check if we can connect to the database
+    await prisma.$connect();
+
+    // Then try to get the contacts
+    const contacts = await prisma.contact.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    console.log("Fetched contacts:", contacts); // Debug log
+
+    return contacts.map((contact) => ({
+      ...contact,
+      type: mapContactType(contact.type),
+      createdAt: new Date(contact.createdAt),
+      updatedAt: new Date(contact.updatedAt),
+    }));
+  } catch (error) {
+    console.error("Error fetching contacts:", error);
+    throw new Error(
+      `Failed to fetch contacts: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  } finally {
+    // Always disconnect after the operation
+    await prisma.$disconnect();
+  }
+}
+
+export default async function ContactsPage() {
+  try {
+    const contacts = await getContacts();
+
+    if (!Array.isArray(contacts)) {
+      console.error("Contacts is not an array:", contacts);
+      throw new Error("Invalid contacts data format");
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Contacts</h1>
+          <button className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">
+            Add Contact
+          </button>
+        </div>
+
+        <ContactsTable contacts={contacts} />
+      </div>
+    );
+  } catch (error) {
+    console.error("Error in ContactsPage:", error);
+    return (
+      <div className="p-4 rounded-md bg-red-50 text-red-800">
+        <h2 className="text-lg font-semibold mb-2">Error loading contacts</h2>
+        <p>
+          {error instanceof Error
+            ? error.message
+            : "An unexpected error occurred"}
+        </p>
+      </div>
+    );
+  }
+}
 
 ```
 
@@ -332,6 +433,7 @@ import { MaterialEditForm } from "@/components/forms/material-edit-form";
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
 import { Material } from "@/types/material";
 import { notFound, useRouter } from "next/navigation"; // Add this import
 import { use, useEffect, useState } from "react";
@@ -355,6 +457,7 @@ export default function MaterialPage({
   const resolvedParams = use(params);
   const [material, setMaterial] = useState<Material | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     getMaterial(resolvedParams.materialId).then(setMaterial);
@@ -364,43 +467,15 @@ export default function MaterialPage({
     return <div>Loading...</div>;
   }
 
-  const handleSave = async (updatedMaterial: Partial<Material>) => {
-    try {
-      const response = await fetch(`/api/materials/${material.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedMaterial),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update material");
-      }
-
-      const updated = await response.json();
-      setMaterial(updated);
-      setIsEditDialogOpen(false);
-    } catch (error) {
-      console.error("Error updating material:", error);
-    }
+  // Handlers for successful operations
+  const handleSaveSuccess = (updatedMaterial: Material) => {
+    setMaterial(updatedMaterial);
+    setIsEditDialogOpen(false);
   };
 
-  const handleDelete = async () => {
-    try {
-      const response = await fetch(`/api/materials/${material.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete material");
-      }
-
-      router.push("/inventory"); // Redirect to inventory page after deletion
-      router.refresh(); // Refresh the page data
-    } catch (error) {
-      console.error("Error deleting material:", error);
-    }
+  const handleDeleteSuccess = () => {
+    router.push("/inventory");
+    router.refresh();
   };
 
   const detailItems = [
@@ -464,8 +539,8 @@ export default function MaterialPage({
       >
         <MaterialEditForm
           material={material}
-          onSave={handleSave}
-          onDelete={handleDelete}
+          onSaveSuccess={handleSaveSuccess}
+          onDeleteSuccess={handleDeleteSuccess}
           onCancel={() => setIsEditDialogOpen(false)}
         />
       </DialogComponent>
@@ -521,107 +596,206 @@ export default function OperationsLoading() {
 # app/(routes)/operations/material-orders/[orderId]/page.tsx
 
 ```tsx
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { DetailsView } from "@/components/ui/details-view";
+"use client";
+
+import { MaterialOrderEditForm } from "@/components/forms/material-order-edit-form";
 import { BackButton } from "@/components/ui/back-button";
-import { OrderStatus } from "@/types/materialOrder";
+import { DetailsView } from "@/components/ui/details-view";
+import { DialogComponent } from "@/components/ui/dialog";
+import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
+import { notFound, useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
 
 async function getOrder(orderId: string) {
-  const order = await prisma.materialOrder.findUnique({
-    where: {
-      id: orderId,
-    },
-    include: {
-      orderItems: {
-        include: {
-          material: true,
-        },
-      },
-    },
-  });
+  try {
+    const response = await fetch(`/api/material-orders/${orderId}`);
+    const data = await response.json();
 
-  if (!order) {
-    notFound();
+    if (!data || response.status === 404) {
+      notFound();
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching order:", error);
+    throw error;
   }
-
-  return order;
 }
 
-export default async function OrderPage({
+function getStatusColor(status: OrderStatus) {
+  switch (status) {
+    case OrderStatus.PENDING:
+      return "bg-yellow-100 text-yellow-800";
+    case OrderStatus.CONFIRMED:
+      return "bg-blue-100 text-blue-800";
+    case OrderStatus.SHIPPED:
+      return "bg-purple-100 text-purple-800";
+    case OrderStatus.DELIVERED:
+      return "bg-green-100 text-green-800";
+    case OrderStatus.CANCELLED:
+      return "bg-red-100 text-red-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+export default function OrderPage({
   params,
 }: {
-  params: { orderId: string };
+  params: Promise<{ orderId: string }>;
 }) {
-  const order = await getOrder(params.orderId);
+  const router = useRouter();
+  const resolvedParams = use(params);
+  const [order, setOrder] = useState<MaterialOrder | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  useEffect(() => {
+    getOrder(resolvedParams.orderId).then(setOrder);
+  }, [resolvedParams.orderId]);
+
+  if (!order) {
+    return <div>Loading...</div>;
+  }
+
+  const handleSave = async (updatedOrder: Partial<MaterialOrder>) => {
+    try {
+      const response = await fetch(`/api/material-orders/${order.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedOrder),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update order");
+      }
+
+      const updated = await response.json();
+      setOrder(updated);
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating order:", error);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const response = await fetch(`/api/material-orders/${order.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete order");
+      }
+
+      router.push("/operations/material-orders");
+      router.refresh();
+    } catch (error) {
+      console.error("Error deleting order:", error);
+    }
+  };
 
   const detailItems = [
     { label: "Order Number", value: order.orderNumber },
     { label: "Supplier", value: order.supplier },
-    { label: "Status", value: (
-      <span className={`px-2 py-1 rounded-full text-sm ${getStatusColor(order.status as OrderStatus)}`}>
-        {order.status}
-      </span>
-    )},
-    { label: "Total Price", value: `${order.totalPrice} ${order.currency}` },
-    { label: "Order Date", value: new Date(order.orderDate).toLocaleDateString() },
-    { label: "Expected Delivery", value: new Date(order.expectedDelivery).toLocaleDateString() },
-    { label: "Actual Delivery", value: order.actualDelivery 
-      ? new Date(order.actualDelivery).toLocaleDateString() 
-      : "Not delivered yet"
+    {
+      label: "Status",
+      value: (
+        <span
+          className={`px-2 py-1 rounded-full text-sm ${getStatusColor(
+            order.status
+          )}`}
+        >
+          {order.status}
+        </span>
+      ),
     },
-    { label: "Order Items", value: (
-      <div className="space-y-2">
-        {order.orderItems.map((item) => (
-          <div key={item.id} className="flex items-center gap-2">
-            <div 
-              className="w-4 h-4 rounded-full border" 
-              style={{ backgroundColor: item.material.colorCode }}
-            />
-            <span>{item.material.type} - {item.material.color}</span>
-            <span className="text-gray-500">
-              ({item.quantity} {item.unit} @ {item.unitPrice} {order.currency})
-            </span>
-            <span className="text-gray-500">
-              Total: {item.totalPrice} {order.currency}
-            </span>
-          </div>
-        ))}
-      </div>
-    )},
+    { label: "Total Price", value: `${order.totalPrice} ${order.currency}` },
+    {
+      label: "Order Date",
+      value: new Date(order.orderDate).toLocaleDateString(),
+    },
+    {
+      label: "Expected Delivery",
+      value: new Date(order.expectedDelivery).toLocaleDateString(),
+    },
+    {
+      label: "Actual Delivery",
+      value: order.actualDelivery
+        ? new Date(order.actualDelivery).toLocaleDateString()
+        : "Not delivered yet",
+    },
+    {
+      label: "Order Items",
+      value: (
+        <div className="space-y-2">
+          {order.orderItems.map((item) => (
+            <div key={item.id} className="flex items-center gap-2">
+              <div
+                className="w-4 h-4 rounded-full border"
+                style={{ backgroundColor: item.material.colorCode }}
+              />
+              <span>
+                {item.material.type} - {item.material.color}
+              </span>
+              <span className="text-gray-500">
+                ({item.quantity} {item.unit} @ {item.unitPrice} {order.currency}
+                )
+              </span>
+              <span className="text-gray-500">
+                Total: {item.totalPrice} {order.currency}
+              </span>
+            </div>
+          ))}
+        </div>
+      ),
+    },
     { label: "Notes", value: order.notes || "No notes" },
-    { label: "Created At", value: new Date(order.createdAt).toLocaleDateString() },
-    { label: "Updated At", value: new Date(order.updatedAt).toLocaleDateString() },
+    {
+      label: "Created At",
+      value: new Date(order.createdAt).toLocaleDateString(),
+    },
+    {
+      label: "Updated At",
+      value: new Date(order.updatedAt).toLocaleDateString(),
+    },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Order Details</h1>
-        <BackButton />
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Order Details</h1>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsEditDialogOpen(true)}
+              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+            >
+              Edit
+            </button>
+            <BackButton />
+          </div>
+        </div>
+        <DetailsView title={`Order ${order.orderNumber}`} items={detailItems} />
       </div>
-      <DetailsView title={`Order ${order.orderNumber}`} items={detailItems} />
-    </div>
+
+      <DialogComponent
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        title="Edit Order"
+      >
+        <MaterialOrderEditForm
+          order={order}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onCancel={() => setIsEditDialogOpen(false)}
+        />
+      </DialogComponent>
+    </>
   );
 }
 
-// Helper function for status colors (copied from materials-orders-table)
-function getStatusColor(status: OrderStatus) {
-  switch (status) {
-    case OrderStatus.PENDING:
-      return 'bg-yellow-100 text-yellow-800';
-    case OrderStatus.CONFIRMED:
-      return 'bg-blue-100 text-blue-800';
-    case OrderStatus.SHIPPED:
-      return 'bg-purple-100 text-purple-800';
-    case OrderStatus.DELIVERED:
-      return 'bg-green-100 text-green-800';
-    case OrderStatus.CANCELLED:
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}
 ```
 
 # app/(routes)/operations/material-orders/loading.tsx
@@ -1006,19 +1180,382 @@ export default async function ProductsPage() {
 
 ```
 
+# app/api/debug/contacts/route.ts
+
+```ts
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  try {
+    // Log available models
+    console.log("Available Prisma models:", Object.keys(prisma));
+
+    // Check if we can connect to the database
+    await prisma.$connect();
+    console.log("Successfully connected to database");
+
+    // Try to count contacts first
+    const contactCount = await prisma.contact.count();
+    console.log("Number of contacts:", contactCount);
+
+    // Get all contacts
+    const contacts = await prisma.contact.findMany();
+    console.log("Found contacts:", contacts);
+
+    return NextResponse.json({
+      success: true,
+      contactCount,
+      contacts,
+      prismaModels: Object.keys(prisma),
+    });
+  } catch (error) {
+    console.error("Debug API Error:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        errorDetails: error,
+      },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+```
+
+# app/api/material-orders/[orderId]/route.ts
+
+```ts
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: { orderId: string } }
+) {
+  try {
+    const order = await prisma.materialOrder.findUnique({
+      where: {
+        id: params.orderId,
+      },
+      include: {
+        orderItems: {
+          include: {
+            material: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(order);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error fetching order" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { orderId: string } }
+) {
+  try {
+    const json = await request.json();
+
+    // Convert string dates to Date objects
+    const updateData = {
+      ...json,
+      orderDate: json.orderDate ? new Date(json.orderDate) : undefined,
+      expectedDelivery: json.expectedDelivery
+        ? new Date(json.expectedDelivery)
+        : undefined,
+      actualDelivery: json.actualDelivery
+        ? new Date(json.actualDelivery)
+        : null,
+      totalPrice: json.totalPrice ? parseFloat(json.totalPrice) : undefined,
+    };
+
+    const order = await prisma.materialOrder.update({
+      where: {
+        id: params.orderId,
+      },
+      data: updateData,
+      include: {
+        orderItems: {
+          include: {
+            material: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(order);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error updating order" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { orderId: string } }
+) {
+  try {
+    // First, delete all associated order items
+    await prisma.materialOrderItem.deleteMany({
+      where: {
+        orderId: params.orderId,
+      },
+    });
+
+    // Then delete the order itself
+    await prisma.materialOrder.delete({
+      where: {
+        id: params.orderId,
+      },
+    });
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error deleting order" },
+      { status: 500 }
+    );
+  }
+}
+
+```
+
+# app/api/material-orders/route.ts
+
+```ts
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  try {
+    const orders = await prisma.materialOrder.findMany({
+      include: {
+        orderItems: {
+          include: {
+            material: true,
+          },
+        },
+      },
+    });
+    return NextResponse.json(orders);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error fetching orders" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const json = await request.json();
+
+    // Validate required fields
+    const requiredFields = [
+      "orderNumber",
+      "supplier",
+      "totalPrice",
+      "currency",
+      "orderDate",
+      "expectedDelivery",
+      "status",
+    ];
+
+    for (const field of requiredFields) {
+      if (json[field] === undefined || json[field] === null) {
+        return NextResponse.json(
+          { error: `Missing required field: ${field}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const order = await prisma.materialOrder.create({
+      data: {
+        orderNumber: json.orderNumber,
+        supplier: json.supplier,
+        totalPrice: parseFloat(json.totalPrice),
+        currency: json.currency,
+        orderDate: new Date(json.orderDate),
+        expectedDelivery: new Date(json.expectedDelivery),
+        actualDelivery: json.actualDelivery ? new Date(json.actualDelivery) : null,
+        status: json.status,
+        notes: json.notes || null,
+      },
+      include: {
+        orderItems: {
+          include: {
+            material: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(order);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error creating order" },
+      { status: 500 }
+    );
+  }
+}
+```
+
 # app/api/materials/[materialId]/route.ts
 
 ```ts
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-// ... keep existing GET and PATCH methods ...
+export async function GET(
+  _request: Request,
+  { params }: { params: { materialId: string } }
+) {
+  try {
+    const material = await prisma.material.findUnique({
+      where: {
+        id: params.materialId,
+      },
+      include: {
+        products: {
+          include: {
+            product: true,
+          },
+        },
+        materialOrderItems: {
+          include: {
+            order: true,
+          },
+        },
+      },
+    });
+
+    if (!material) {
+      return NextResponse.json(
+        { error: "Material not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(material);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error fetching material" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { materialId: string } }
+) {
+  try {
+    const json = await request.json();
+
+    const material = await prisma.material.update({
+      where: {
+        id: params.materialId,
+      },
+      data: {
+        type: json.type,
+        color: json.color,
+        colorCode: json.colorCode,
+        brand: json.brand,
+        quantity: parseFloat(json.quantity),
+        unit: json.unit,
+        costPerUnit: parseFloat(json.costPerUnit),
+        currency: json.currency,
+        location: json.location,
+        notes: json.notes || null,
+      },
+      include: {
+        products: {
+          include: {
+            product: true,
+          },
+        },
+        materialOrderItems: {
+          include: {
+            order: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(material);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error updating material" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function DELETE(
   _request: Request,
   { params }: { params: { materialId: string } }
 ) {
   try {
+    // First, check if the material exists
+    const material = await prisma.material.findUnique({
+      where: {
+        id: params.materialId,
+      },
+      include: {
+        products: true,
+        materialOrderItems: true,
+      },
+    });
+
+    if (!material) {
+      return NextResponse.json(
+        { error: "Material not found" },
+        { status: 404 }
+      );
+    }
+
+    // Check if material is being used in products or orders
+    if (
+      material.products.length > 0 ||
+      material.materialOrderItems.length > 0
+    ) {
+      return NextResponse.json(
+        {
+          error: "Cannot delete material that is in use",
+          details: {
+            productsCount: material.products.length,
+            ordersCount: material.materialOrderItems.length,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // If all checks pass, delete the material
     await prisma.material.delete({
       where: {
         id: params.materialId,
@@ -1138,7 +1675,64 @@ export async function POST(request: Request) {
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-// ... keep existing GET and PATCH methods ...
+export async function GET(
+  _request: Request,
+  { params }: { params: { productId: string } }
+) {
+  try {
+    const product = await prisma.product.findUnique({
+      where: {
+        id: params.productId,
+      },
+      include: {
+        materials: {
+          include: {
+            material: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(product);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error fetching product" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { productId: string } }
+) {
+  try {
+    const json = await request.json();
+
+    const product = await prisma.product.update({
+      where: {
+        id: params.productId,
+      },
+      data: json,
+    });
+
+    return NextResponse.json(product);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error updating product" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function DELETE(
   _request: Request,
@@ -1160,7 +1754,6 @@ export async function DELETE(
     );
   }
 }
-
 ```
 
 # app/api/stylematerial/route.ts
@@ -1219,13 +1812,135 @@ export async function POST(request: Request) {
 
 ```
 
+# app/components/data-tables/contacts-table.tsx
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { Contact, ContactType } from "@/types/contact";
+import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
+import { useRouter } from "next/navigation";
+
+interface Column {
+  header: string;
+  accessorKey: string;
+  cell?: (item: Contact) => React.ReactNode;
+}
+
+const columns: Column[] = [
+  {
+    header: "Name",
+    accessorKey: "name",
+  },
+  {
+    header: "Email",
+    accessorKey: "email",
+  },
+  {
+    header: "Phone",
+    accessorKey: "phone",
+  },
+  {
+    header: "Company",
+    accessorKey: "company",
+  },
+  {
+    header: "Role",
+    accessorKey: "role",
+  },
+  {
+    header: "Type",
+    accessorKey: "type",
+    cell: (contact) => (
+      <span
+        className={`px-2 py-1 rounded-full text-sm ${getTypeColor(
+          contact.type
+        )}`}
+      >
+        {contact.type}
+      </span>
+    ),
+  },
+];
+
+function getTypeColor(type: ContactType) {
+  switch (type) {
+    case ContactType.SUPPLIER:
+      return 'bg-blue-100 text-blue-800';
+    case ContactType.MANUFACTURER:
+      return 'bg-purple-100 text-purple-800';
+    case ContactType.CUSTOMER:
+      return 'bg-green-100 text-green-800';
+    case ContactType.OTHER:
+      return 'bg-gray-100 text-gray-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+}
+
+export function ContactsTable({ contacts: initialContacts }: { contacts: Contact[] }) {
+  const router = useRouter();
+  const [contacts] = useState(initialContacts);
+
+  return (
+    <div className="rounded-md border">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b bg-gray-50">
+            {columns.map((column) => (
+              <th
+                key={column.accessorKey}
+                className="px-4 py-2 text-left text-sm font-medium text-gray-500"
+              >
+                {column.header}
+              </th>
+            ))}
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {contacts.map((contact) => (
+            <tr key={contact.id} className="border-b hover:bg-gray-50">
+              {columns.map((column) => (
+                <td
+                  key={`${contact.id}-${column.accessorKey}`}
+                  className="px-4 py-2 text-sm"
+                >
+                  {column.cell
+                    ? column.cell(contact)
+                    : String(contact[column.accessorKey as keyof Contact] || '-')}
+                </td>
+              ))}
+              <td className="px-4 py-2 text-sm">
+                <DataTableRowActions
+                  onView={() => router.push(`/contacts/${contact.id}`)}
+                  onEdit={() => console.log('Edit:', contact.id)}
+                  onDelete={() => console.log('Delete:', contact.id)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
 # app/components/data-tables/materials-orders-table.tsx
 
 ```tsx
 "use client";
+
+import { MaterialOrderEditForm } from "@/components/forms/material-order-edit-form";
 import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
+import { DialogComponent } from "@/components/ui/dialog";
 import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 interface Column {
   header: string;
@@ -1289,54 +2004,142 @@ function getStatusColor(status: OrderStatus) {
   }
 }
 
-export function MaterialOrdersTable({ orders }: { orders: MaterialOrder[] }) {
+export function MaterialOrdersTable({
+  orders: initialOrders,
+}: {
+  orders: MaterialOrder[];
+}) {
   const router = useRouter();
+  const [orders, setOrders] = useState(initialOrders);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<MaterialOrder | null>(
+    null
+  );
+
+  const handleEdit = (order: MaterialOrder) => {
+    setSelectedOrder(order);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSave = async (updatedOrder: Partial<MaterialOrder>) => {
+    if (!selectedOrder) return;
+
+    try {
+      const response = await fetch(`/api/material-orders/${selectedOrder.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedOrder),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update order");
+      }
+
+      const updated = await response.json();
+
+      // Update the local state with the new data
+      setOrders(orders.map((o) => (o.id === updated.id ? updated : o)));
+
+      setIsEditDialogOpen(false);
+      setSelectedOrder(null);
+    } catch (error) {
+      console.error("Error updating order:", error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      const response = await fetch(`/api/material-orders/${selectedOrder.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete order");
+      }
+
+      // Update local state by removing the deleted order
+      setOrders(orders.filter((o) => o.id !== selectedOrder.id));
+      setIsEditDialogOpen(false);
+      setSelectedOrder(null);
+      router.refresh(); // Refresh the page data
+    } catch (error) {
+      console.error("Error deleting order:", error);
+    }
+  };
 
   return (
-    <div className="rounded-md border">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b bg-gray-50">
-            {columns.map((column) => (
-              <th
-                key={column.accessorKey}
-                className="px-4 py-2 text-left text-sm font-medium text-gray-500"
-              >
-                {column.header}
-              </th>
-            ))}
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => (
-            <tr key={order.id} className="border-b hover:bg-gray-50">
+    <>
+      <div className="rounded-md border">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b bg-gray-50">
               {columns.map((column) => (
-                <td
-                  key={`${order.id}-${column.accessorKey}`}
-                  className="px-4 py-2 text-sm"
+                <th
+                  key={column.accessorKey}
+                  className="px-4 py-2 text-left text-sm font-medium text-gray-500"
                 >
-                  {column.cell
-                    ? column.cell(order)
-                    : String(order[column.accessorKey as keyof MaterialOrder])}
-                </td>
+                  {column.header}
+                </th>
               ))}
-              <td className="px-4 py-2 text-sm">
-                <DataTableRowActions
-                  onView={() =>
-                    router.push(`/operations/material-orders/${order.id}`)
-                  }
-                  onEdit={() => console.log("Edit:", order.id)}
-                  onDelete={() => console.log("Delete:", order.id)}
-                />
-              </td>
+              <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+                Actions
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {orders.map((order) => (
+              <tr key={order.id} className="border-b hover:bg-gray-50">
+                {columns.map((column) => (
+                  <td
+                    key={`${order.id}-${column.accessorKey}`}
+                    className="px-4 py-2 text-sm"
+                  >
+                    {column.cell
+                      ? column.cell(order)
+                      : String(
+                          order[column.accessorKey as keyof MaterialOrder]
+                        )}
+                  </td>
+                ))}
+                <td className="px-4 py-2 text-sm">
+                  <DataTableRowActions
+                    onView={() =>
+                      router.push(`/operations/material-orders/${order.id}`)
+                    }
+                    onEdit={() => handleEdit(order)}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {selectedOrder && (
+        <DialogComponent
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            setIsEditDialogOpen(open);
+            if (!open) setSelectedOrder(null);
+          }}
+          title="Edit Order"
+        >
+          <MaterialOrderEditForm
+            order={selectedOrder}
+            onSave={handleSave}
+            onDelete={handleDelete}
+            onCancel={() => {
+              setIsEditDialogOpen(false);
+              setSelectedOrder(null);
+            }}
+          />
+        </DialogComponent>
+      )}
+    </>
   );
 }
 
@@ -1434,6 +2237,28 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
     }
   };
 
+  const handleDelete = async () => {
+    if (!selectedMaterial) return;
+
+    try {
+      const response = await fetch(`/api/materials/${selectedMaterial.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete material");
+      }
+
+      // Update local state by removing the deleted material
+      setMaterials(materials.filter(m => m.id !== selectedMaterial.id));
+      setIsEditDialogOpen(false);
+      setSelectedMaterial(null);
+      router.refresh(); // Refresh the page data
+    } catch (error) {
+      console.error("Error deleting material:", error);
+    }
+  };
+
   return (
     <>
       <div className="rounded-md border">
@@ -1470,16 +2295,6 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
                   <DataTableRowActions
                     onView={() => router.push(`/inventory/materials/${material.id}`)}
                     onEdit={() => handleEdit(material)}
-                    onDelete={async () => {
-      if (!confirm("Are you sure you want to delete this material?")) return;
-      try {
-        const response = await fetch(`/api/materials/${'Delete:', material.id}`, { method: "DELETE" });
-        if (!response.ok) throw new Error("Failed to delete material");
-        setMaterials(materials.filter(m => m.id !== material.id));
-      } catch (error) {
-        console.error("Error deleting material:", error);
-      }
-    }}
                   />
                 </td>
               </tr>
@@ -1500,6 +2315,7 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
           <MaterialEditForm
             material={selectedMaterial}
             onSave={handleSave}
+            onDelete={handleDelete}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedMaterial(null);
@@ -1510,7 +2326,6 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
     </>
   );
 }
-
 ```
 
 # app/components/data-tables/products-table.tsx
@@ -1616,7 +2431,28 @@ export function ProductsTable({ products: initialProducts }: { products: Product
       setSelectedProduct(null);
     } catch (error) {
       console.error('Error updating product:', error);
-      // Handle error (show error message to user)
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedProduct) return;
+
+    try {
+      const response = await fetch(`/api/products/${selectedProduct.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete product");
+      }
+
+      // Update local state by removing the deleted product
+      setProducts(products.filter(p => p.id !== selectedProduct.id));
+      setIsEditDialogOpen(false);
+      setSelectedProduct(null);
+      router.refresh(); // Refresh the page data
+    } catch (error) {
+      console.error("Error deleting product:", error);
     }
   };
 
@@ -1656,16 +2492,6 @@ export function ProductsTable({ products: initialProducts }: { products: Product
                   <DataTableRowActions
                     onView={() => router.push(`/products/${product.id}`)}
                     onEdit={() => handleEdit(product)}
-                    onDelete={async () => {
-      if (!confirm("Are you sure you want to delete this product?")) return;
-      try {
-        const response = await fetch(`/api/products/${'Delete:', product.id}`, { method: "DELETE" });
-        if (!response.ok) throw new Error("Failed to delete product");
-        setProducts(products.filter(p => p.id !== product.id));
-      } catch (error) {
-        console.error("Error deleting product:", error);
-      }
-    }}
                   />
                 </td>
               </tr>
@@ -1686,6 +2512,7 @@ export function ProductsTable({ products: initialProducts }: { products: Product
           <ProductEditForm
             product={selectedProduct}
             onSave={handleSave}
+            onDelete={handleDelete}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedProduct(null);
@@ -1703,18 +2530,24 @@ export function ProductsTable({ products: initialProducts }: { products: Product
 ```tsx
 "use client";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { Material, MeasurementUnit } from "@/types/material";
 import { useState } from "react";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface MaterialEditFormProps {
   material: Material;
-  onSave: (updatedMaterial: Partial<Material>) => Promise<void>;
-  onDelete: () => Promise<void>;
+  onSaveSuccess: (updatedMaterial: Material) => void;
+  onDeleteSuccess: () => void;
   onCancel: () => void;
 }
 
-export function MaterialEditForm({ material, onSave, onDelete, onCancel }: MaterialEditFormProps) {
+export function MaterialEditForm({
+  material,
+  onSaveSuccess,
+  onDeleteSuccess,
+  onCancel,
+}: MaterialEditFormProps) {
   const [formData, setFormData] = useState({
     type: material.type,
     color: material.color,
@@ -1728,6 +2561,7 @@ export function MaterialEditForm({ material, onSave, onDelete, onCancel }: Mater
     notes: material.notes || "",
   });
 
+  const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -1736,9 +2570,27 @@ export function MaterialEditForm({ material, onSave, onDelete, onCancel }: Mater
     e.preventDefault();
     setIsSaving(true);
     try {
-      await onSave(formData);
+      const response = await fetch(`/api/materials/${material.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to update material");
+      }
+
+      showToast("Material updated successfully", "success");
+      onSaveSuccess(data);
     } catch (error) {
-      console.error('Error saving material:', error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to update material",
+        "error"
+      );
     } finally {
       setIsSaving(false);
     }
@@ -1747,9 +2599,26 @@ export function MaterialEditForm({ material, onSave, onDelete, onCancel }: Mater
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      await onDelete();
+      const response = await fetch(`/api/materials/${material.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            `Failed to delete material: ${response.status} ${response.statusText}`
+        );
+      }
+
+      showToast("Material deleted successfully", "success");
+      onDeleteSuccess();
     } catch (error) {
-      console.error('Error deleting material:', error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete material",
+        "error"
+      );
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -1758,8 +2627,151 @@ export function MaterialEditForm({ material, onSave, onDelete, onCancel }: Mater
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Existing form fields remain the same */}
-        {/* ... */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Type</label>
+            <input
+              type="text"
+              value={formData.type}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, type: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Brand</label>
+            <input
+              type="text"
+              value={formData.brand}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, brand: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Color</label>
+            <input
+              type="text"
+              value={formData.color}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, color: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Color Code
+            </label>
+            <input
+              type="text"
+              value={formData.colorCode}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, colorCode: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Quantity
+            </label>
+            <input
+              type="number"
+              value={formData.quantity}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  quantity: parseFloat(e.target.value),
+                }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Unit</label>
+            <select
+              value={formData.unit}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  unit: e.target.value as MeasurementUnit,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            >
+              {Object.values(MeasurementUnit).map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Cost Per Unit
+            </label>
+            <input
+              type="number"
+              value={formData.costPerUnit}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  costPerUnit: parseFloat(e.target.value),
+                }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Currency
+            </label>
+            <input
+              type="text"
+              value={formData.currency}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, currency: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2 col-span-2">
+            <label className="text-sm font-medium text-gray-700">
+              Location
+            </label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, location: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Notes</label>
+          <textarea
+            value={formData.notes}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, notes: e.target.value }))
+            }
+            rows={3}
+            className="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
           <button
@@ -1782,7 +2794,271 @@ export function MaterialEditForm({ material, onSave, onDelete, onCancel }: Mater
               disabled={isSaving}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </form>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Material"
+        description="Are you sure you want to delete this material? This action cannot be undone."
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isLoading={isDeleting}
+      />
+    </>
+  );
+}
+
+```
+
+# app/components/forms/material-order-edit-form.tsx
+
+```tsx
+"use client";
+
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
+import { useState } from "react";
+
+interface MaterialOrderEditFormProps {
+  order: MaterialOrder;
+  onSave: (updatedOrder: Partial<MaterialOrder>) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onCancel: () => void;
+}
+
+// Helper function to safely format dates
+const formatDate = (date: Date | string | null | undefined) => {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d instanceof Date && !isNaN(d.getTime())
+    ? d.toISOString().split("T")[0]
+    : "";
+};
+
+export function MaterialOrderEditForm({
+  order,
+  onSave,
+  onDelete,
+  onCancel,
+}: MaterialOrderEditFormProps) {
+  const [formData, setFormData] = useState({
+    orderNumber: order.orderNumber,
+    supplier: order.supplier,
+    status: order.status,
+    totalPrice: order.totalPrice,
+    currency: order.currency,
+    orderDate: formatDate(order.orderDate),
+    expectedDelivery: formatDate(order.expectedDelivery),
+    actualDelivery: formatDate(order.actualDelivery),
+    notes: order.notes || "",
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await onSave({
+        ...formData,
+        totalPrice: parseFloat(formData.totalPrice.toString()),
+        orderDate: new Date(formData.orderDate),
+        expectedDelivery: new Date(formData.expectedDelivery),
+        actualDelivery: formData.actualDelivery
+          ? new Date(formData.actualDelivery)
+          : null,
+      });
+    } catch (error) {
+      console.error("Error saving order:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete();
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  return (
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Order Number
+            </label>
+            <input
+              type="text"
+              value={formData.orderNumber}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  orderNumber: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Supplier
+            </label>
+            <input
+              type="text"
+              value={formData.supplier}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, supplier: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  status: e.target.value as OrderStatus,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            >
+              {Object.values(OrderStatus).map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Total Price
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.01"
+                value={formData.totalPrice}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    totalPrice: parseFloat(e.target.value),
+                  }))
+                }
+                className="flex-1 px-3 py-2 border rounded-md"
+              />
+              <input
+                type="text"
+                value={formData.currency}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, currency: e.target.value }))
+                }
+                className="w-20 px-3 py-2 border rounded-md"
+                placeholder="USD"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Order Date
+            </label>
+            <input
+              type="date"
+              value={formData.orderDate}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, orderDate: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Expected Delivery
+            </label>
+            <input
+              type="date"
+              value={formData.expectedDelivery}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  expectedDelivery: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2 col-span-2">
+            <label className="text-sm font-medium text-gray-700">
+              Actual Delivery
+            </label>
+            <input
+              type="date"
+              value={formData.actualDelivery}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  actualDelivery: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2 col-span-2">
+            <label className="text-sm font-medium text-gray-700">Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, notes: e.target.value }))
+              }
+              rows={3}
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-between border-t pt-6 mt-6">
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+          >
+            Delete Order
+          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+            >
+              {isSaving ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </div>
@@ -1791,8 +3067,8 @@ export function MaterialEditForm({ material, onSave, onDelete, onCancel }: Mater
       <ConfirmDialog
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
-        title="Delete Material"
-        description="Are you sure you want to delete this material? This action cannot be undone."
+        title="Delete Order"
+        description="Are you sure you want to delete this order? This action cannot be undone."
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
         isLoading={isDeleting}
@@ -1815,7 +3091,7 @@ import { useState } from "react";
 interface ProductEditFormProps {
   product: Product;
   onSave: (updatedProduct: Partial<Product>) => Promise<void>;
-  onDelete: () => Promise<void>;
+  onDelete?: () => Promise<void>;
   onCancel: () => void;
 }
 
@@ -1827,8 +3103,8 @@ export function ProductEditForm({
 }: ProductEditFormProps) {
   const [formData, setFormData] = useState({
     sku: product.sku,
-    name: product.name,
     piece: product.piece,
+    name: product.name,
     season: product.season,
     phase: product.phase,
     notes: product.notes || "",
@@ -1851,6 +3127,7 @@ export function ProductEditForm({
   };
 
   const handleDelete = async () => {
+    if (!onDelete) return;
     setIsDeleting(true);
     try {
       await onDelete();
@@ -1947,13 +3224,15 @@ export function ProductEditForm({
         </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
-          >
-            Delete Product
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+            >
+              Delete Product
+            </button>
+          )}
           <div className="flex gap-3">
             <button
               type="button"
@@ -1973,15 +3252,17 @@ export function ProductEditForm({
         </div>
       </form>
 
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        title="Delete Product"
-        description="Are you sure you want to delete this product? This action cannot be undone."
-        onConfirm={handleDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-        isLoading={isDeleting}
-      />
+      {onDelete && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="Delete Product"
+          description="Are you sure you want to delete this product? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          isLoading={isDeleting}
+        />
+      )}
     </>
   );
 }
@@ -2413,6 +3694,126 @@ export function DialogComponent({
 
 ```
 
+# app/components/ui/toast.tsx
+
+```tsx
+"use client";
+
+import { cn } from "@/lib/utils/styles";
+import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import React, { useEffect } from "react";
+
+export type ToastType = "success" | "error" | "info";
+
+interface Toast {
+  id: string;
+  message: string;
+  type: ToastType;
+}
+
+interface ToastProviderProps {
+  children: React.ReactNode;
+}
+
+interface ToastContextType {
+  showToast: (message: string, type: ToastType) => void;
+}
+
+const ToastContext = React.createContext<ToastContextType | undefined>(
+  undefined
+);
+
+export function ToastProvider({ children }: ToastProviderProps) {
+  const [toasts, setToasts] = React.useState<Toast[]>([]);
+
+  const showToast = (message: string, type: ToastType) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts((prevToasts) => [...prevToasts, { id, message, type }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
+  };
+
+  return (
+    <ToastContext.Provider value={{ showToast }}>
+      {children}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map((toast) => (
+          <ToastNotification
+            key={toast.id}
+            {...toast}
+            onDismiss={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const context = React.useContext(ToastContext);
+  if (context === undefined) {
+    throw new Error("useToast must be used within a ToastProvider");
+  }
+  return context;
+}
+
+interface ToastNotificationProps {
+  message: string;
+  type: ToastType;
+  onDismiss: () => void;
+}
+
+function ToastNotification({
+  message,
+  type,
+  onDismiss,
+}: ToastNotificationProps) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onDismiss();
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  const Icon = {
+    success: CheckCircle2,
+    error: AlertCircle,
+    info: AlertCircle,
+  }[type];
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg min-w-[300px] animate-slide-in-right",
+        {
+          "bg-red-50 text-red-900": type === "error",
+          "bg-green-50 text-green-900": type === "success",
+          "bg-blue-50 text-blue-900": type === "info",
+        }
+      )}
+    >
+      <Icon
+        className={cn("w-5 h-5", {
+          "text-red-500": type === "error",
+          "text-green-500": type === "success",
+          "text-blue-500": type === "info",
+        })}
+      />
+      <p className="flex-1 text-sm font-medium">{message}</p>
+      <button onClick={onDismiss} className="text-gray-400 hover:text-gray-500">
+        <XCircle className="w-5 h-5" />
+      </button>
+    </div>
+  );
+}
+
+export default ToastProvider;
+
+```
+
 # app/favicon.ico
 
 This is a binary file of the type: Binary
@@ -2449,7 +3850,8 @@ This is a binary file of the type: Binary
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: 'GeistVF', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: "GeistVF", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
 }
 
 /* Custom utilities */
@@ -2471,12 +3873,28 @@ body {
   @apply outline-2 outline-blue-500 outline-offset-2 rounded-sm;
 }
 
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
 ```
 
 # app/layout.tsx
 
 ```tsx
 // app/layout.tsx
+import { ToastProvider } from "@/components/ui/toast";
 import { Header } from "./components/layout/header";
 import "./globals.css";
 
@@ -2488,20 +3906,22 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="h-full bg-gray-50">
-        <div className="flex h-screen overflow-hidden">
-          {/* Sidebar */}
-          {/* <aside className="w-64 bg-white hidden md:block">
-            <Sidebar />
-          </aside> */}
+        <ToastProvider>
+          <div className="flex h-screen overflow-hidden">
+            {/* Sidebar */}
+            {/* <aside className="w-64 bg-white hidden md:block">
+              <Sidebar />
+            </aside> */}
 
-          {/* Main content */}
-          <div className="flex-1 flex flex-col min-w-0">
-            <Header />
-            <main className="flex-1 overflow-y-auto bg-gray-50 px-8 py-6">
-              <div className="mx-auto max-w-7xl">{children}</div>
-            </main>
+            {/* Main content */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <Header />
+              <main className="flex-1 overflow-y-auto bg-gray-50 px-8 py-6">
+                <div className="mx-auto max-w-7xl">{children}</div>
+              </main>
+            </div>
           </div>
-        </div>
+        </ToastProvider>
       </body>
     </html>
   );
@@ -2651,6 +4071,30 @@ export default function Home() {
   );
 }
 
+```
+
+# app/types/contact.ts
+
+```ts
+export enum ContactType {
+  SUPPLIER = 'SUPPLIER',
+  MANUFACTURER = 'MANUFACTURER',
+  CUSTOMER = 'CUSTOMER',
+  OTHER = 'OTHER'
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  company?: string | null;
+  role?: string | null;
+  type: ContactType;
+  notes?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 ```
 
 # app/types/material.ts
@@ -3084,6 +4528,33 @@ ALTER TABLE "MaterialOrderItem" ADD CONSTRAINT "MaterialOrderItem_materialId_fke
 
 ```
 
+# prisma/migrations/20241111030050_add_contacts/migration.sql
+
+```sql
+-- CreateEnum
+CREATE TYPE "ContactType" AS ENUM ('SUPPLIER', 'MANUFACTURER', 'CUSTOMER', 'OTHER');
+
+-- CreateTable
+CREATE TABLE "Contact" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "phone" TEXT,
+    "company" TEXT,
+    "role" TEXT,
+    "type" "ContactType" NOT NULL,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Contact_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Contact_email_key" ON "Contact"("email");
+
+```
+
 # prisma/migrations/migration_lock.toml
 
 ```toml
@@ -3218,6 +4689,26 @@ enum OrderStatus {
   CANCELLED
 }
 
+model Contact {
+  id        String      @id @default(cuid())
+  name      String
+  email     String      @unique
+  phone     String?
+  company   String?
+  role      String?
+  type      ContactType
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+enum ContactType {
+  SUPPLIER
+  MANUFACTURER
+  CUSTOMER
+  OTHER
+}
+
 ```
 
 # public/file.svg
@@ -3288,17 +4779,73 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 []
 ```
 
+# scripts/debug-db.ts
+
+```ts
+import { PrismaClient } from "@prisma/client";
+
+async function debugDatabase() {
+  const prisma = new PrismaClient();
+
+  try {
+    console.log("Attempting to connect to database...");
+    await prisma.$connect();
+    console.log("Successfully connected to database");
+
+    // Check all models
+    console.log("\nChecking all models...");
+    const models = Object.keys(prisma).filter((key) => !key.startsWith("$"));
+    console.log("Available models:", models);
+
+    // Check contacts specifically
+    console.log("\nChecking contacts...");
+    const contactCount = await prisma.contact.count();
+    console.log("Number of contacts:", contactCount);
+
+    if (contactCount > 0) {
+      const contacts = await prisma.contact.findMany();
+      console.log("First contact:", contacts[0]);
+      console.log("Total contacts found:", contacts.length);
+    }
+
+    // Check related models
+    console.log("\nChecking other models...");
+    const materialCount = await prisma.material.count();
+    const productCount = await prisma.product.count();
+    const orderCount = await prisma.materialOrder.count();
+
+    console.log("Database summary:");
+    console.log("- Contacts:", contactCount);
+    console.log("- Materials:", materialCount);
+    console.log("- Products:", productCount);
+    console.log("- Material Orders:", orderCount);
+  } catch (error) {
+    console.error("Error during database debug:", error);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+debugDatabase().catch((e) => {
+  console.error("Script error:", e);
+  process.exit(1);
+});
+
+```
+
 # scripts/seed.ts
 
 ```ts
 // scripts/seed.ts
-import { PrismaClient } from '@prisma/client'
-import { OrderStatus, MeasurementUnit } from '../app/types/materialOrder'
+import { PrismaClient } from "@prisma/client";
+import { ContactType } from "../app/types/contact";
+import { MeasurementUnit, OrderStatus } from "../app/types/materialOrder";
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 const materials = [
   { color: "Linen White", colorCode: "2071" },
+  { color: "Linen AAA", colorCode: "2571" },
   { color: "Navy Blue", colorCode: "2108" },
   { color: "Orange", colorCode: "2088" },
   { color: "Pink", colorCode: "2102" },
@@ -3307,11 +4854,15 @@ const materials = [
   { color: "Black", colorCode: "2094" },
   { color: "Cerulean Blue", colorCode: "2098" },
   { color: "Dark Green", colorCode: "2095" },
-  { color: "Light Green", colorCode: "2083" }
+  { color: "Light Green", colorCode: "2083" },
 ];
 
 const products = [
-  { piece: "Scrunchie with Picot Trim", name: "Classic", sku: "SCRUNCH-PICOT-001" },
+  {
+    piece: "Scrunchie with Picot Trim",
+    name: "Classic",
+    sku: "SCRUNCH-PICOT-001",
+  },
   { piece: "Bracelet", name: "Classic", sku: "BRACE-CLASS-001" },
   { piece: "Bandana", name: "Classic", sku: "BAND-CLASS-001" },
   { piece: "Bucket Hat", name: "Classic", sku: "BUCKET-CLASS-001" },
@@ -3319,40 +4870,74 @@ const products = [
   { piece: "Wide Brim Sun Hat", name: "Stripes", sku: "WBRIM-STRIP-001" },
   { piece: "Shell Sun Hat", name: "Classic", sku: "SHELL-CLASS-001" },
   { piece: "Shell Sun Hat", name: "Stripes", sku: "SHELL-STRIP-001" },
-  { piece: "Scallop Edge Bucket Hat", name: "Classic", sku: "SCALBUCK-CLASS-001" }
+  {
+    piece: "Scallop Edge Bucket Hat",
+    name: "Classic",
+    sku: "SCALBUCK-CLASS-001",
+  },
 ];
 
 const materialOrders = [
   {
     orderNumber: "MO-2024-001",
     supplier: "Campolmi Florence",
-    totalPrice: 2500.00,
+    totalPrice: 2500.0,
     currency: "EUR",
     orderDate: new Date("2024-01-15"),
     expectedDelivery: new Date("2024-02-15"),
     status: OrderStatus.CONFIRMED,
-    notes: "Spring/Summer 2024 first order"
+    notes: "Spring/Summer 2024 first order",
   },
   {
     orderNumber: "MO-2024-002",
     supplier: "Campolmi Florence",
-    totalPrice: 1800.00,
+    totalPrice: 1800.0,
     currency: "EUR",
     orderDate: new Date("2024-01-20"),
     expectedDelivery: new Date("2024-02-20"),
     status: OrderStatus.PENDING,
-    notes: "Additional materials for SS24"
+    notes: "Additional materials for SS24",
   },
   {
     orderNumber: "MO-2024-003",
     supplier: "Campolmi Florence",
-    totalPrice: 3200.00,
+    totalPrice: 3200.0,
     currency: "EUR",
     orderDate: new Date("2024-02-01"),
     expectedDelivery: new Date("2024-03-01"),
     status: OrderStatus.PENDING,
-    notes: "Pre-production materials order"
-  }
+    notes: "Pre-production materials order",
+  },
+];
+
+const contacts = [
+  {
+    name: "John Smith",
+    email: "john.smith@supplier.com",
+    phone: "+1 (555) 123-4567",
+    company: "Campolmi Florence",
+    role: "Sales Representative",
+    type: ContactType.SUPPLIER,
+    notes: "Main fabric supplier contact",
+  },
+  {
+    name: "Maria Garcia",
+    email: "maria.garcia@manufacturer.com",
+    phone: "+1 (555) 234-5678",
+    company: "Quality Manufacturing Co.",
+    role: "Production Manager",
+    type: ContactType.MANUFACTURER,
+    notes: "Primary manufacturing contact",
+  },
+  {
+    name: "David Lee",
+    email: "david.lee@customer.com",
+    phone: "+1 (555) 345-6789",
+    company: "Fashion Retail Group",
+    role: "Buyer",
+    type: ContactType.CUSTOMER,
+    notes: "Key wholesale customer",
+  },
 ];
 
 async function seed() {
@@ -3363,12 +4948,13 @@ async function seed() {
     await prisma.productMaterial.deleteMany();
     await prisma.product.deleteMany();
     await prisma.material.deleteMany();
-    
-    console.log('Cleared existing data');
+    await prisma.contact.deleteMany();
+
+    console.log("Cleared existing data");
 
     // Add materials
     const createdMaterials = await Promise.all(
-      materials.map(material =>
+      materials.map((material) =>
         prisma.material.create({
           data: {
             type: "Cotton",
@@ -3381,17 +4967,17 @@ async function seed() {
             currency: "EUR",
             location: "Warehouse",
             notes: "30/2x4x4",
-            photos: []
-          }
+            photos: [],
+          },
         })
       )
     );
-    
+
     console.log(`Added ${createdMaterials.length} materials`);
 
     // Add products
     const createdProducts = await Promise.all(
-      products.map(product =>
+      products.map((product) =>
         prisma.product.create({
           data: {
             sku: product.sku,
@@ -3400,17 +4986,17 @@ async function seed() {
             season: "SS24",
             phase: "SWATCH",
             notes: `Initial creation of ${product.piece} - ${product.name}`,
-            photos: []
-          }
+            photos: [],
+          },
         })
       )
     );
-    
+
     console.log(`Added ${createdProducts.length} products`);
 
     // Add material orders
     const createdOrders = await Promise.all(
-      materialOrders.map(order =>
+      materialOrders.map((order) =>
         prisma.materialOrder.create({
           data: {
             orderNumber: order.orderNumber,
@@ -3420,13 +5006,32 @@ async function seed() {
             orderDate: order.orderDate,
             expectedDelivery: order.expectedDelivery,
             status: order.status,
-            notes: order.notes
-          }
+            notes: order.notes,
+          },
         })
       )
     );
 
     console.log(`Added ${createdOrders.length} material orders`);
+
+    // Add contacts
+    const createdContacts = await Promise.all(
+      contacts.map((contact) =>
+        prisma.contact.create({
+          data: {
+            name: contact.name,
+            email: contact.email,
+            phone: contact.phone,
+            company: contact.company,
+            role: contact.role,
+            type: contact.type,
+            notes: contact.notes,
+          },
+        })
+      )
+    );
+
+    console.log(`Added ${createdContacts.length} contacts`);
 
     // Add material order items
     // Create some sample order items for each order
@@ -3434,10 +5039,11 @@ async function seed() {
       // Add 2-3 items per order with different materials
       const numItems = Math.floor(Math.random() * 2) + 2; // 2-3 items
       for (let i = 0; i < numItems; i++) {
-        const material = createdMaterials[Math.floor(Math.random() * createdMaterials.length)];
+        const material =
+          createdMaterials[Math.floor(Math.random() * createdMaterials.length)];
         const quantity = Math.floor(Math.random() * 50) + 10; // 10-60 units
         const unitPrice = Math.random() * 20 + 10; // 10-30 per unit
-        
+
         await prisma.materialOrderItem.create({
           data: {
             orderId: order.id,
@@ -3446,29 +5052,28 @@ async function seed() {
             unit: MeasurementUnit.KILOGRAM,
             unitPrice: unitPrice,
             totalPrice: quantity * unitPrice,
-            notes: `Order item for ${material.color}`
-          }
+            notes: `Order item for ${material.color}`,
+          },
         });
       }
     }
 
-    console.log('Added material order items');
+    console.log("Added material order items");
 
-    // Optional: Create some product-material relationships
-    // Example: Associate first material with first product
+    // Create some product-material relationships
     await prisma.productMaterial.create({
       data: {
         productId: createdProducts[0].id,
         materialId: createdMaterials[0].id,
         quantity: 1.0,
         unit: MeasurementUnit.KILOGRAM,
-        notes: "Main material"
-      }
+        notes: "Main material",
+      },
     });
 
-    console.log('Seeding completed successfully');
+    console.log("Seeding completed successfully");
   } catch (error) {
-    console.error('Error seeding data:', error);
+    console.error("Error seeding data:", error);
   } finally {
     await prisma.$disconnect();
   }

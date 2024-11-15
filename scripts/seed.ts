@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 
 const materials = [
   { color: "Linen White", colorCode: "2071" },
+  { color: "Linen AAA", colorCode: "2571" },
   { color: "Navy Blue", colorCode: "2108" },
   { color: "Orange", colorCode: "2088" },
   { color: "Pink", colorCode: "2102" },

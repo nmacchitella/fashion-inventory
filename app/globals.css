@@ -19,7 +19,8 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: 'GeistVF', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: "GeistVF", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
 }
 
 /* Custom utilities */
@@ -39,4 +40,19 @@ body {
 /* Better focus styles */
 :focus-visible {
   @apply outline-2 outline-blue-500 outline-offset-2 rounded-sm;
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
 }

@@ -87,59 +87,58 @@ export async function PATCH(
     );
   }
 }
+// app/api/materials/[materialId]/route.ts
+// app/api/materials/[materialId]/route.ts
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: { materialId: string } }
 ) {
   try {
-    // First, check if the material exists
-    const material = await prisma.material.findUnique({
+    const materialId = params.materialId;
+
+    // Check if material is used in any products or orders
+    const materialInUse = await prisma.material.findFirst({
       where: {
-        id: params.materialId,
-      },
-      include: {
-        products: true,
-        materialOrderItems: true,
+        id: materialId,
+        OR: [
+          {
+            products: {
+              some: {}, // Check if used in any ProductMaterial
+            },
+          },
+          {
+            materialOrderItems: {
+              some: {}, // Check if used in any MaterialOrderItem
+            },
+          },
+        ],
       },
     });
 
-    if (!material) {
-      return NextResponse.json(
-        { error: "Material not found" },
-        { status: 404 }
-      );
-    }
-
-    // Check if material is being used in products or orders
-    if (
-      material.products.length > 0 ||
-      material.materialOrderItems.length > 0
-    ) {
+    if (materialInUse) {
       return NextResponse.json(
         {
-          error: "Cannot delete material that is in use",
-          details: {
-            productsCount: material.products.length,
-            ordersCount: material.materialOrderItems.length,
-          },
+          message:
+            "Cannot delete material because it is in use. This material is referenced in products or orders. Remove these references before deleting.",
         },
         { status: 400 }
       );
     }
 
-    // If all checks pass, delete the material
     await prisma.material.delete({
       where: {
-        id: params.materialId,
+        id: materialId,
       },
     });
 
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({
+      message: "Material deleted successfully",
+    });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error deleting material:", error);
     return NextResponse.json(
-      { error: "Error deleting material" },
+      { message: "Failed to delete material" },
       { status: 500 }
     );
   }

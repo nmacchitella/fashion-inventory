@@ -1,24 +1,22 @@
-import { MaterialsTable } from "@/components/data-tables/materials-table";
+// app/inventory/page.tsx
 import { prisma } from "@/lib/prisma";
+import { InventoryControls } from "./inventory-controls";
 
 async function getInventory() {
-  const materials = await prisma.material.findMany();
+  const materials = await prisma.material.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
   return materials;
 }
 
 export default async function InventoryPage() {
-  const materials = await getInventory();
+  const initialMaterials = await getInventory();
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Inventory</h1>
-        <button className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">
-          Add Material
-        </button>
-      </div>
-
-      <MaterialsTable materials={materials} />
+      <InventoryControls initialMaterials={initialMaterials} />
     </div>
   );
 }
