@@ -411,6 +411,88 @@ export default async function DashboardPage() {
 
 ```
 
+# app/(routes)/inventory/inventory-controls.tsx
+
+```tsx
+// app/inventory/inventory-controls.tsx
+"use client";
+
+import { MaterialsTable } from "@/components/data-tables/materials-table";
+import { AddMaterialDialog } from "@/components/forms/add-material-dialog";
+import { Material } from "@/types/material";
+import { useState } from "react";
+
+interface InventoryControlsProps {
+  initialMaterials: Material[];
+}
+
+export function InventoryControls({
+  initialMaterials,
+}: InventoryControlsProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [materials, setMaterials] = useState(initialMaterials);
+
+  const handleAddSuccess = (newMaterial: Material) => {
+    setMaterials((prevMaterials) => [newMaterial, ...prevMaterials]);
+    setIsAddDialogOpen(false);
+  };
+
+  const handleDelete = async (materialId: string) => {
+    try {
+      const response = await fetch(`/api/materials/${materialId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        // Get the error message from the API if available
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete material");
+      }
+
+      setMaterials((prevMaterials) =>
+        prevMaterials.filter((m) => m.id !== materialId)
+      );
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      throw error; // Propagate error to MaterialEditForm
+    }
+  };
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Inventory</h1>
+        <button
+          onClick={() => setIsAddDialogOpen(true)}
+          className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+        >
+          Add Material
+        </button>
+      </div>
+
+      <MaterialsTable
+        materials={materials}
+        onDelete={handleDelete}
+        onUpdate={(updatedMaterial) => {
+          setMaterials((prevMaterials) =>
+            prevMaterials.map((m) =>
+              m.id === updatedMaterial.id ? updatedMaterial : m
+            )
+          );
+        }}
+      />
+
+      <AddMaterialDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSuccess={handleAddSuccess}
+      />
+    </>
+  );
+}
+
+```
+
 # app/(routes)/inventory/loading.tsx
 
 ```tsx
@@ -553,27 +635,25 @@ export default function MaterialPage({
 # app/(routes)/inventory/page.tsx
 
 ```tsx
-import { MaterialsTable } from "@/components/data-tables/materials-table";
+// app/inventory/page.tsx
 import { prisma } from "@/lib/prisma";
+import { InventoryControls } from "./inventory-controls";
 
 async function getInventory() {
-  const materials = await prisma.material.findMany();
+  const materials = await prisma.material.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
   return materials;
 }
 
 export default async function InventoryPage() {
-  const materials = await getInventory();
+  const initialMaterials = await getInventory();
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Inventory</h1>
-        <button className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">
-          Add Material
-        </button>
-      </div>
-
-      <MaterialsTable materials={materials} />
+      <InventoryControls initialMaterials={initialMaterials} />
     </div>
   );
 }
@@ -1140,41 +1220,104 @@ export default function ProductsLoading() {
 
 ```tsx
 import { prisma } from "@/lib/prisma";
-import { ProductsTable } from "@/components/data-tables/products-table";
-import { Product } from "@/types/product";
+import { ProductsControls } from "./products-controls";
 
-async function getProducts(): Promise<Product[]> {
+async function getProducts() {
   const products = await prisma.product.findMany({
     orderBy: {
-      createdAt: 'desc'
-    }
+      createdAt: "desc",
+    },
   });
 
-  // Convert Prisma types to our custom types
-  return products.map(product => ({
-    ...product,
-    notes: product.notes || undefined, // Convert null to undefined
-    createdAt: new Date(product.createdAt),
-    updatedAt: new Date(product.updatedAt)
-  }));
+  return products;
 }
 
 export default async function ProductsPage() {
-  const products = await getProducts();
+  const initialProducts = await getProducts();
 
   return (
     <div className="space-y-4">
+      <ProductsControls initialProducts={initialProducts} />
+    </div>
+  );
+}
+
+```
+
+# app/(routes)/products/products-controls.tsx
+
+```tsx
+"use client";
+
+import { ProductsTable } from "@/components/data-tables/products-table";
+import { AddProductDialog } from "@/components/forms/add-product-dialog";
+import { Product } from "@/types/product";
+import { useState } from "react";
+
+interface ProductsControlsProps {
+  initialProducts: Product[];
+}
+
+export function ProductsControls({ initialProducts }: ProductsControlsProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [products, setProducts] = useState(initialProducts);
+
+  const handleAddSuccess = (newProduct: Product) => {
+    setProducts((prevProducts) => [newProduct, ...prevProducts]);
+    setIsAddDialogOpen(false);
+  };
+
+  const handleDelete = async (productId: string) => {
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log(errorData);
+        throw new Error(errorData.error || "Failed to delete product");
+      }
+
+      setProducts((prevProducts) =>
+        prevProducts.filter((p) => p.id !== productId)
+      );
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      throw error;
+    }
+  };
+
+  return (
+    <>
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Products</h1>
-        <button 
+        <button
+          onClick={() => setIsAddDialogOpen(true)}
           className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
         >
           Add Product
         </button>
       </div>
-      
-      <ProductsTable products={products} />
-    </div>
+
+      <ProductsTable
+        products={products}
+        onDelete={handleDelete}
+        onUpdate={(updatedProduct) => {
+          setProducts((prevProducts) =>
+            prevProducts.map((p) =>
+              p.id === updatedProduct.id ? updatedProduct : p
+            )
+          );
+        }}
+      />
+
+      <AddProductDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSuccess={handleAddSuccess}
+      />
+    </>
   );
 }
 
@@ -1514,59 +1657,58 @@ export async function PATCH(
     );
   }
 }
+// app/api/materials/[materialId]/route.ts
+// app/api/materials/[materialId]/route.ts
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: { materialId: string } }
 ) {
   try {
-    // First, check if the material exists
-    const material = await prisma.material.findUnique({
+    const materialId = params.materialId;
+
+    // Check if material is used in any products or orders
+    const materialInUse = await prisma.material.findFirst({
       where: {
-        id: params.materialId,
-      },
-      include: {
-        products: true,
-        materialOrderItems: true,
+        id: materialId,
+        OR: [
+          {
+            products: {
+              some: {}, // Check if used in any ProductMaterial
+            },
+          },
+          {
+            materialOrderItems: {
+              some: {}, // Check if used in any MaterialOrderItem
+            },
+          },
+        ],
       },
     });
 
-    if (!material) {
-      return NextResponse.json(
-        { error: "Material not found" },
-        { status: 404 }
-      );
-    }
-
-    // Check if material is being used in products or orders
-    if (
-      material.products.length > 0 ||
-      material.materialOrderItems.length > 0
-    ) {
+    if (materialInUse) {
       return NextResponse.json(
         {
-          error: "Cannot delete material that is in use",
-          details: {
-            productsCount: material.products.length,
-            ordersCount: material.materialOrderItems.length,
-          },
+          message:
+            "Cannot delete material because it is in use. This material is referenced in products or orders. Remove these references before deleting.",
         },
         { status: 400 }
       );
     }
 
-    // If all checks pass, delete the material
     await prisma.material.delete({
       where: {
-        id: params.materialId,
+        id: materialId,
       },
     });
 
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({
+      message: "Material deleted successfully",
+    });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error deleting material:", error);
     return NextResponse.json(
-      { error: "Error deleting material" },
+      { message: "Failed to delete material" },
       { status: 500 }
     );
   }
@@ -1577,7 +1719,7 @@ export async function DELETE(
 # app/api/materials/route.ts
 
 ```ts
-import { prisma } from "@/app/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -1694,10 +1836,7 @@ export async function GET(
     });
 
     if (!product) {
-      return NextResponse.json(
-        { error: "Product not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     return NextResponse.json(product);
@@ -1733,27 +1872,123 @@ export async function PATCH(
     );
   }
 }
-
 export async function DELETE(
   _request: Request,
   { params }: { params: { productId: string } }
 ) {
   try {
-    await prisma.product.delete({
-      where: {
-        id: params.productId,
+    console.log("Attempting to delete product:", params.productId);
+
+    // First check if product exists
+    const product = await prisma.product.findUnique({
+      where: { id: params.productId },
+      include: {
+        materials: true,
       },
     });
 
-    return new NextResponse(null, { status: 204 });
+    if (!product) {
+      console.log("Product not found:", params.productId);
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Use a transaction to ensure all operations complete successfully
+    await prisma.$transaction(async (tx) => {
+      // First delete all product-material relationships
+      await tx.productMaterial.deleteMany({
+        where: {
+          productId: params.productId,
+        },
+      });
+
+      // Then delete the product
+      await tx.product.delete({
+        where: {
+          id: params.productId,
+        },
+      });
+    });
+
+    console.log("Product and related records deleted successfully");
+    return NextResponse.json({
+      message: "Product deleted successfully",
+      id: params.productId,
+    });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error during product deletion:", error);
     return NextResponse.json(
-      { error: "Error deleting product" },
+      {
+        error: "Error deleting product",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
+
+```
+
+# app/api/products/route.ts
+
+```ts
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  try {
+    const products = await prisma.product.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    return NextResponse.json(products);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error fetching products" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const json = await request.json();
+
+    // Validate required fields
+    const requiredFields = ["sku", "piece", "name", "season", "phase"];
+
+    for (const field of requiredFields) {
+      if (!json[field]) {
+        return NextResponse.json(
+          { error: `Missing required field: ${field}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        sku: json.sku,
+        piece: json.piece,
+        name: json.name,
+        season: json.season,
+        phase: json.phase,
+        notes: json.notes || null,
+        photos: json.photos || [],
+      },
+    });
+
+    return NextResponse.json(product);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error creating product" },
+      { status: 500 }
+    );
+  }
+}
+
 ```
 
 # app/api/stylematerial/route.ts
@@ -2148,14 +2383,20 @@ export function MaterialOrdersTable({
 # app/components/data-tables/materials-table.tsx
 
 ```tsx
-"use client"
+"use client";
 
+import { MaterialEditForm } from "@/components/forms/material-edit-form";
+import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
+import { DialogComponent } from "@/components/ui/dialog";
+import { Material } from "@/types/material";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Material } from "@/types/material"
-import { DataTableRowActions } from "@/components/ui/data-table-row-actions"
-import { useRouter } from "next/navigation"
-import { DialogComponent } from "@/components/ui/dialog"
-import { MaterialEditForm } from "@/components/forms/material-edit-form"
+
+interface MaterialsTableProps {
+  materials: Material[];
+  onDelete?: (materialId: string) => void;
+  onUpdate?: (updatedMaterial: Material) => void;
+}
 
 interface Column {
   header: string;
@@ -2173,8 +2414,8 @@ const columns: Column[] = [
     accessorKey: "color",
     cell: (material) => (
       <div className="flex items-center gap-2">
-        <div 
-          className="w-4 h-4 rounded-full border" 
+        <div
+          className="w-4 h-4 rounded-full border"
           style={{ backgroundColor: material.colorCode }}
         />
         {material.color}
@@ -2193,14 +2434,19 @@ const columns: Column[] = [
   {
     header: "Brand",
     accessorKey: "brand",
-  }
+  },
 ];
 
-export function MaterialsTable({ materials: initialMaterials }: { materials: Material[] }) {
+export function MaterialsTable({
+  materials,
+  onDelete,
+  onUpdate,
+}: MaterialsTableProps) {
   const router = useRouter();
-  const [materials, setMaterials] = useState(initialMaterials);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(
+    null
+  );
 
   const handleEdit = (material: Material) => {
     setSelectedMaterial(material);
@@ -2212,50 +2458,27 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
 
     try {
       const response = await fetch(`/api/materials/${selectedMaterial.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(updatedMaterial),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update material');
+        throw new Error("Failed to update material");
       }
 
       const updated = await response.json();
-      
-      // Update the local state with the new data
-      setMaterials(materials.map(m => 
-        m.id === updated.id ? updated : m
-      ));
-      
-      setIsEditDialogOpen(false);
-      setSelectedMaterial(null);
-    } catch (error) {
-      console.error('Error updating material:', error);
-    }
-  };
 
-  const handleDelete = async () => {
-    if (!selectedMaterial) return;
-
-    try {
-      const response = await fetch(`/api/materials/${selectedMaterial.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete material");
+      if (onUpdate) {
+        onUpdate(updated);
       }
 
-      // Update local state by removing the deleted material
-      setMaterials(materials.filter(m => m.id !== selectedMaterial.id));
       setIsEditDialogOpen(false);
       setSelectedMaterial(null);
-      router.refresh(); // Refresh the page data
     } catch (error) {
-      console.error("Error deleting material:", error);
+      console.error("Error updating material:", error);
     }
   };
 
@@ -2266,8 +2489,8 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
           <thead>
             <tr className="border-b bg-gray-50">
               {columns.map((column) => (
-                <th 
-                  key={column.accessorKey} 
+                <th
+                  key={column.accessorKey}
                   className="px-4 py-2 text-left text-sm font-medium text-gray-500"
                 >
                   {column.header}
@@ -2282,18 +2505,20 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
             {materials.map((material) => (
               <tr key={material.id} className="border-b hover:bg-gray-50">
                 {columns.map((column) => (
-                  <td 
+                  <td
                     key={`${material.id}-${column.accessorKey}`}
                     className="px-4 py-2 text-sm"
                   >
-                    {column.cell 
+                    {column.cell
                       ? column.cell(material)
                       : String(material[column.accessorKey as keyof Material])}
                   </td>
                 ))}
                 <td className="px-4 py-2 text-sm">
                   <DataTableRowActions
-                    onView={() => router.push(`/inventory/materials/${material.id}`)}
+                    onView={() =>
+                      router.push(`/inventory/materials/${material.id}`)
+                    }
                     onEdit={() => handleEdit(material)}
                   />
                 </td>
@@ -2314,31 +2539,39 @@ export function MaterialsTable({ materials: initialMaterials }: { materials: Mat
         >
           <MaterialEditForm
             material={selectedMaterial}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSaveSuccess={handleSave}
+            onDeleteSuccess={onDelete}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedMaterial(null);
             }}
+            mode="edit"
           />
         </DialogComponent>
       )}
     </>
   );
 }
+
 ```
 
 # app/components/data-tables/products-table.tsx
 
 ```tsx
-"use client"
+"use client";
 
+import { ProductEditForm } from "@/components/forms/product-edit-form";
+import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
+import { DialogComponent } from "@/components/ui/dialog";
+import { Product } from "@/types/product";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { DataTableRowActions } from "@/components/ui/data-table-row-actions"
-import { Product } from "@/types/product"
-import { useRouter } from "next/navigation"
-import { DialogComponent } from "@/components/ui/dialog"
-import { ProductEditForm } from "@/components/forms/product-edit-form"
+
+interface ProductsTableProps {
+  products: Product[];
+  onDelete?: (productId: string) => void;
+  onUpdate?: (updatedProduct: Product) => void;
+}
 
 interface Column {
   header: string;
@@ -2367,35 +2600,40 @@ const columns: Column[] = [
     header: "Phase",
     accessorKey: "phase",
     cell: (product) => (
-      <span className={`px-2 py-1 rounded-full text-sm ${
-        getPhaseColor(product.phase)
-      }`}>
+      <span
+        className={`px-2 py-1 rounded-full text-sm ${getPhaseColor(
+          product.phase
+        )}`}
+      >
         {product.phase}
       </span>
     ),
-  }
+  },
 ];
 
 function getPhaseColor(phase: string) {
   switch (phase) {
-    case 'SWATCH':
-      return 'bg-blue-100 text-blue-800';
-    case 'INITIAL_SAMPLE':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'FIT_SAMPLE':
-      return 'bg-purple-100 text-purple-800';
-    case 'PRODUCTION_SAMPLE':
-      return 'bg-orange-100 text-orange-800';
-    case 'PRODUCTION':
-      return 'bg-green-100 text-green-800';
+    case "SWATCH":
+      return "bg-blue-100 text-blue-800";
+    case "INITIAL_SAMPLE":
+      return "bg-yellow-100 text-yellow-800";
+    case "FIT_SAMPLE":
+      return "bg-purple-100 text-purple-800";
+    case "PRODUCTION_SAMPLE":
+      return "bg-orange-100 text-orange-800";
+    case "PRODUCTION":
+      return "bg-green-100 text-green-800";
     default:
-      return 'bg-gray-100 text-gray-800';
+      return "bg-gray-100 text-gray-800";
   }
 }
 
-export function ProductsTable({ products: initialProducts }: { products: Product[] }) {
+export function ProductsTable({
+  products,
+  onDelete,
+  onUpdate,
+}: ProductsTableProps) {
   const router = useRouter();
-  const [products, setProducts] = useState(initialProducts);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -2409,50 +2647,27 @@ export function ProductsTable({ products: initialProducts }: { products: Product
 
     try {
       const response = await fetch(`/api/products/${selectedProduct.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(updatedProduct),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update product');
+        throw new Error("Failed to update product");
       }
 
       const updated = await response.json();
-      
-      // Update the local state with the new data
-      setProducts(products.map(p => 
-        p.id === updated.id ? updated : p
-      ));
-      
-      setIsEditDialogOpen(false);
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error('Error updating product:', error);
-    }
-  };
 
-  const handleDelete = async () => {
-    if (!selectedProduct) return;
-
-    try {
-      const response = await fetch(`/api/products/${selectedProduct.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete product");
+      if (onUpdate) {
+        onUpdate(updated);
       }
 
-      // Update local state by removing the deleted product
-      setProducts(products.filter(p => p.id !== selectedProduct.id));
       setIsEditDialogOpen(false);
       setSelectedProduct(null);
-      router.refresh(); // Refresh the page data
     } catch (error) {
-      console.error("Error deleting product:", error);
+      console.error("Error updating product:", error);
     }
   };
 
@@ -2463,8 +2678,8 @@ export function ProductsTable({ products: initialProducts }: { products: Product
           <thead>
             <tr className="border-b bg-gray-50">
               {columns.map((column) => (
-                <th 
-                  key={column.accessorKey} 
+                <th
+                  key={column.accessorKey}
                   className="px-4 py-2 text-left text-sm font-medium text-gray-500"
                 >
                   {column.header}
@@ -2479,11 +2694,11 @@ export function ProductsTable({ products: initialProducts }: { products: Product
             {products.map((product) => (
               <tr key={product.id} className="border-b hover:bg-gray-50">
                 {columns.map((column) => (
-                  <td 
+                  <td
                     key={`${product.id}-${column.accessorKey}`}
                     className="px-4 py-2 text-sm"
                   >
-                    {column.cell 
+                    {column.cell
                       ? column.cell(product)
                       : String(product[column.accessorKey as keyof Product])}
                   </td>
@@ -2511,18 +2726,164 @@ export function ProductsTable({ products: initialProducts }: { products: Product
         >
           <ProductEditForm
             product={selectedProduct}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSaveSuccess={handleSave}
+            onDeleteSuccess={onDelete}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedProduct(null);
             }}
+            mode="edit"
           />
         </DialogComponent>
       )}
     </>
   );
 }
+
+```
+
+# app/components/forms/add-material-dialog.tsx
+
+```tsx
+import { MaterialEditForm } from "@/components/forms/material-edit-form";
+import { DialogComponent } from "@/components/ui/dialog";
+import { Material, MeasurementUnit } from "@/types/material";
+
+interface AddMaterialDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (material: Material) => void;
+}
+
+const defaultMaterial: Omit<Material, "id" | "createdAt" | "updatedAt"> = {
+  type: "",
+  color: "",
+  colorCode: "",
+  brand: "",
+  quantity: 0,
+  unit: MeasurementUnit.KILOGRAM,
+  costPerUnit: 0,
+  currency: "USD",
+  location: "",
+  notes: "",
+  photos: [],
+};
+
+export function AddMaterialDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: AddMaterialDialogProps) {
+  const handleSave = async (materialData: Partial<Material>) => {
+    try {
+      const response = await fetch("/api/materials", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(materialData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create material");
+      }
+
+      const newMaterial = await response.json();
+      onSuccess(newMaterial);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error creating material:", error);
+      throw error;
+    }
+  };
+
+  return (
+    <DialogComponent
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Add New Material"
+    >
+      <MaterialEditForm
+        material={defaultMaterial as Material} // Type assertion since we omit id/dates
+        onSaveSuccess={handleSave}
+        onCancel={() => onOpenChange(false)}
+        mode="create"
+      />
+    </DialogComponent>
+  );
+}
+
+```
+
+# app/components/forms/add-product-dialog.tsx
+
+```tsx
+import { ProductEditForm } from "@/components/forms/product-edit-form";
+import { DialogComponent } from "@/components/ui/dialog";
+import { Product } from "@/types/product";
+
+interface AddProductDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (product: Product) => void;
+}
+
+const defaultProduct: Omit<Product, "id" | "createdAt" | "updatedAt"> = {
+  sku: "",
+  piece: "",
+  name: "",
+  season: "",
+  phase: "SWATCH",
+  notes: "",
+  photos: [],
+};
+
+export function AddProductDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: AddProductDialogProps) {
+  const handleSave = async (productData: Partial<Product>) => {
+    try {
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(productData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create product");
+      }
+
+      const newProduct = await response.json();
+      onSuccess(newProduct);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      throw error;
+    }
+  };
+
+  return (
+    <DialogComponent
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Add New Product"
+    >
+      <ProductEditForm
+        product={defaultProduct as Product}
+        onSave={handleSave}
+        onCancel={() => onOpenChange(false)}
+        mode="create"
+      />
+    </DialogComponent>
+  );
+}
+
 ```
 
 # app/components/forms/material-edit-form.tsx
@@ -2538,8 +2899,9 @@ import { useState } from "react";
 interface MaterialEditFormProps {
   material: Material;
   onSaveSuccess: (updatedMaterial: Material) => void;
-  onDeleteSuccess: () => void;
+  onDeleteSuccess?: (materialId: string) => Promise<void>; // Update type
   onCancel: () => void;
+  mode?: "edit" | "create";
 }
 
 export function MaterialEditForm({
@@ -2547,6 +2909,7 @@ export function MaterialEditForm({
   onSaveSuccess,
   onDeleteSuccess,
   onCancel,
+  mode = "edit",
 }: MaterialEditFormProps) {
   const [formData, setFormData] = useState({
     type: material.type,
@@ -2570,25 +2933,14 @@ export function MaterialEditForm({
     e.preventDefault();
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/materials/${material.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to update material");
-      }
-
-      showToast("Material updated successfully", "success");
-      onSaveSuccess(data);
+      onSaveSuccess(formData as Material);
+      showToast(
+        `Material ${mode === "create" ? "created" : "updated"} successfully`,
+        "success"
+      );
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "Failed to update material",
+        error instanceof Error ? error.message : "Failed to save material",
         "error"
       );
     } finally {
@@ -2597,28 +2949,18 @@ export function MaterialEditForm({
   };
 
   const handleDelete = async () => {
+    if (!onDeleteSuccess) return;
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/materials/${material.id}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            `Failed to delete material: ${response.status} ${response.statusText}`
-        );
-      }
-
+      await onDeleteSuccess(material.id);
       showToast("Material deleted successfully", "success");
-      onDeleteSuccess();
+      onCancel();
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : "Failed to delete material",
         "error"
       );
+    } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -2637,6 +2979,7 @@ export function MaterialEditForm({
                 setFormData((prev) => ({ ...prev, type: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -2649,6 +2992,7 @@ export function MaterialEditForm({
                 setFormData((prev) => ({ ...prev, brand: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -2661,6 +3005,7 @@ export function MaterialEditForm({
                 setFormData((prev) => ({ ...prev, color: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -2675,6 +3020,7 @@ export function MaterialEditForm({
                 setFormData((prev) => ({ ...prev, colorCode: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -2692,6 +3038,9 @@ export function MaterialEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
+              min="0"
+              step="0.01"
             />
           </div>
 
@@ -2706,6 +3055,7 @@ export function MaterialEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             >
               {Object.values(MeasurementUnit).map((unit) => (
                 <option key={unit} value={unit}>
@@ -2729,6 +3079,9 @@ export function MaterialEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
+              min="0"
+              step="0.01"
             />
           </div>
 
@@ -2743,6 +3096,7 @@ export function MaterialEditForm({
                 setFormData((prev) => ({ ...prev, currency: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -2757,6 +3111,7 @@ export function MaterialEditForm({
                 setFormData((prev) => ({ ...prev, location: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
         </div>
@@ -2774,14 +3129,16 @@ export function MaterialEditForm({
         </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
-          >
-            Delete Material
-          </button>
-          <div className="flex gap-3">
+          {mode === "edit" && onDeleteSuccess && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+            >
+              Delete Material
+            </button>
+          )}
+          <div className="flex gap-3 ml-auto">
             <button
               type="button"
               onClick={onCancel}
@@ -2794,20 +3151,29 @@ export function MaterialEditForm({
               disabled={isSaving}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving
+                ? mode === "create"
+                  ? "Creating..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create Material"
+                : "Save Changes"}
             </button>
           </div>
         </div>
       </form>
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        title="Delete Material"
-        description="Are you sure you want to delete this material? This action cannot be undone."
-        onConfirm={handleDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-        isLoading={isDeleting}
-      />
+
+      {mode === "edit" && onDeleteSuccess && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="Delete Material"
+          description="Are you sure you want to delete this material? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          isLoading={isDeleting}
+        />
+      )}
     </>
   );
 }
@@ -3085,21 +3451,24 @@ export function MaterialOrderEditForm({
 "use client";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { Product } from "@/types/product";
 import { useState } from "react";
 
 interface ProductEditFormProps {
   product: Product;
-  onSave: (updatedProduct: Partial<Product>) => Promise<void>;
-  onDelete?: () => Promise<void>;
+  onSaveSuccess: (updatedProduct: Product) => void;
+  onDeleteSuccess?: (productId: string) => Promise<void>;
   onCancel: () => void;
+  mode?: "edit" | "create";
 }
 
 export function ProductEditForm({
   product,
-  onSave,
-  onDelete,
+  onSaveSuccess,
+  onDeleteSuccess,
   onCancel,
+  mode = "edit",
 }: ProductEditFormProps) {
   const [formData, setFormData] = useState({
     sku: product.sku,
@@ -3108,8 +3477,10 @@ export function ProductEditForm({
     season: product.season,
     phase: product.phase,
     notes: product.notes || "",
+    photos: product.photos,
   });
 
+  const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -3118,21 +3489,34 @@ export function ProductEditForm({
     e.preventDefault();
     setIsSaving(true);
     try {
-      await onSave(formData);
+      onSaveSuccess(formData as Product);
+      showToast(
+        `Product ${mode === "create" ? "created" : "updated"} successfully`,
+        "success"
+      );
     } catch (error) {
-      console.error("Error saving product:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to save product",
+        "error"
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!onDelete) return;
+    if (!onDeleteSuccess) return;
     setIsDeleting(true);
     try {
-      await onDelete();
+      await onDeleteSuccess(product.id);
+      showToast("Product deleted successfully", "success");
+      onCancel();
     } catch (error) {
-      console.error("Error deleting product:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete product",
+        "error"
+      );
+    } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -3151,6 +3535,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, sku: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3163,6 +3548,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, piece: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3175,6 +3561,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3187,6 +3574,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, season: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3201,6 +3589,7 @@ export function ProductEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             >
               <option value="SWATCH">Swatch</option>
               <option value="INITIAL_SAMPLE">Initial Sample</option>
@@ -3209,22 +3598,22 @@ export function ProductEditForm({
               <option value="PRODUCTION">Production</option>
             </select>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Notes</label>
-          <textarea
-            value={formData.notes}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, notes: e.target.value }))
-            }
-            rows={3}
-            className="w-full px-3 py-2 border rounded-md"
-          />
+          <div className="space-y-2 col-span-2">
+            <label className="text-sm font-medium text-gray-700">Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, notes: e.target.value }))
+              }
+              rows={3}
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
         </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
-          {onDelete && (
+          {mode === "edit" && onDeleteSuccess && (
             <button
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
@@ -3233,7 +3622,7 @@ export function ProductEditForm({
               Delete Product
             </button>
           )}
-          <div className="flex gap-3">
+          <div className="flex gap-3 ml-auto">
             <button
               type="button"
               onClick={onCancel}
@@ -3246,13 +3635,19 @@ export function ProductEditForm({
               disabled={isSaving}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving
+                ? mode === "create"
+                  ? "Creating..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create Product"
+                : "Save Changes"}
             </button>
           </div>
         </div>
       </form>
 
-      {onDelete && (
+      {mode === "edit" && onDeleteSuccess && (
         <ConfirmDialog
           open={showDeleteConfirm}
           onOpenChange={setShowDeleteConfirm}
@@ -4734,42 +5129,7 @@ This is a file of the type: SVG Image
 # README.md
 
 ```md
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-\`\`\`bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-\`\`\`
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+npx ai-digest
 
 ```
 

@@ -1,21 +1,24 @@
 "use client";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { Product } from "@/types/product";
 import { useState } from "react";
 
 interface ProductEditFormProps {
   product: Product;
-  onSave: (updatedProduct: Partial<Product>) => Promise<void>;
-  onDelete?: () => Promise<void>;
+  onSaveSuccess: (updatedProduct: Product) => void;
+  onDeleteSuccess?: (productId: string) => Promise<void>;
   onCancel: () => void;
+  mode?: "edit" | "create";
 }
 
 export function ProductEditForm({
   product,
-  onSave,
-  onDelete,
+  onSaveSuccess,
+  onDeleteSuccess,
   onCancel,
+  mode = "edit",
 }: ProductEditFormProps) {
   const [formData, setFormData] = useState({
     sku: product.sku,
@@ -24,8 +27,10 @@ export function ProductEditForm({
     season: product.season,
     phase: product.phase,
     notes: product.notes || "",
+    photos: product.photos,
   });
 
+  const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -34,21 +39,34 @@ export function ProductEditForm({
     e.preventDefault();
     setIsSaving(true);
     try {
-      await onSave(formData);
+      onSaveSuccess(formData as Product);
+      showToast(
+        `Product ${mode === "create" ? "created" : "updated"} successfully`,
+        "success"
+      );
     } catch (error) {
-      console.error("Error saving product:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to save product",
+        "error"
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!onDelete) return;
+    if (!onDeleteSuccess) return;
     setIsDeleting(true);
     try {
-      await onDelete();
+      await onDeleteSuccess(product.id);
+      showToast("Product deleted successfully", "success");
+      onCancel();
     } catch (error) {
-      console.error("Error deleting product:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete product",
+        "error"
+      );
+    } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -67,6 +85,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, sku: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -79,6 +98,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, piece: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -91,6 +111,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -103,6 +124,7 @@ export function ProductEditForm({
                 setFormData((prev) => ({ ...prev, season: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -117,6 +139,7 @@ export function ProductEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             >
               <option value="SWATCH">Swatch</option>
               <option value="INITIAL_SAMPLE">Initial Sample</option>
@@ -125,22 +148,22 @@ export function ProductEditForm({
               <option value="PRODUCTION">Production</option>
             </select>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Notes</label>
-          <textarea
-            value={formData.notes}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, notes: e.target.value }))
-            }
-            rows={3}
-            className="w-full px-3 py-2 border rounded-md"
-          />
+          <div className="space-y-2 col-span-2">
+            <label className="text-sm font-medium text-gray-700">Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, notes: e.target.value }))
+              }
+              rows={3}
+              className="w-full px-3 py-2 border rounded-md"
+            />
+          </div>
         </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
-          {onDelete && (
+          {mode === "edit" && onDeleteSuccess && (
             <button
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
@@ -149,7 +172,7 @@ export function ProductEditForm({
               Delete Product
             </button>
           )}
-          <div className="flex gap-3">
+          <div className="flex gap-3 ml-auto">
             <button
               type="button"
               onClick={onCancel}
@@ -162,13 +185,19 @@ export function ProductEditForm({
               disabled={isSaving}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving
+                ? mode === "create"
+                  ? "Creating..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create Product"
+                : "Save Changes"}
             </button>
           </div>
         </div>
       </form>
 
-      {onDelete && (
+      {mode === "edit" && onDeleteSuccess && (
         <ConfirmDialog
           open={showDeleteConfirm}
           onOpenChange={setShowDeleteConfirm}

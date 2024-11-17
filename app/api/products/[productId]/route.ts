@@ -6,9 +6,11 @@ export async function GET(
   { params }: { params: { productId: string } }
 ) {
   try {
+    const productId = params.productId;
+
     const product = await prisma.product.findUnique({
       where: {
-        id: params.productId,
+        id: productId,
       },
       include: {
         materials: {
@@ -20,10 +22,7 @@ export async function GET(
     });
 
     if (!product) {
-      return NextResponse.json(
-        { error: "Product not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     return NextResponse.json(product);
@@ -42,10 +41,11 @@ export async function PATCH(
 ) {
   try {
     const json = await request.json();
+    const productId = params.productId;
 
     const product = await prisma.product.update({
       where: {
-        id: params.productId,
+        id: productId,
       },
       data: json,
     });
@@ -59,23 +59,58 @@ export async function PATCH(
     );
   }
 }
-
 export async function DELETE(
   _request: Request,
   { params }: { params: { productId: string } }
 ) {
   try {
-    await prisma.product.delete({
-      where: {
-        id: params.productId,
+    const productId = params.productId;
+
+    console.log("Attempting to delete product:", productId);
+
+    // First check if product exists
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        materials: true,
       },
     });
 
-    return new NextResponse(null, { status: 204 });
+    if (!product) {
+      console.log("Product not found:", productId);
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Use a transaction to ensure all operations complete successfully
+    await prisma.$transaction(async (tx) => {
+      // First delete all product-material relationships
+      await tx.productMaterial.deleteMany({
+        where: {
+          productId: productId,
+        },
+      });
+
+      // Then delete the product
+      await tx.product.delete({
+        where: {
+          id: productId,
+        },
+      });
+    });
+
+    console.log("Product and related records deleted successfully");
+    return NextResponse.json({
+      message: "Product deleted successfully",
+      id: productId,
+    });
   } catch (error) {
-    console.error("Error:", error);
+    console.log("hello");
+    console.error("Error during product deletion:", error);
     return NextResponse.json(
-      { error: "Error deleting product" },
+      {
+        error: "Error deleting product",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

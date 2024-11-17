@@ -159,9 +159,10 @@ export default function ProductPage({
         >
           <ProductEditForm
             product={product}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSaveSuccess={handleSave}
+            onDeleteSuccess={handleDelete}
             onCancel={() => setIsEditDialogOpen(false)}
+            mode="edit"
           />
         </DialogComponent>
       )}

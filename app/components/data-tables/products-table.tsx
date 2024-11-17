@@ -1,11 +1,17 @@
-"use client"
+"use client";
 
+import { ProductEditForm } from "@/components/forms/product-edit-form";
+import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
+import { DialogComponent } from "@/components/ui/dialog";
+import { Product } from "@/types/product";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { DataTableRowActions } from "@/components/ui/data-table-row-actions"
-import { Product } from "@/types/product"
-import { useRouter } from "next/navigation"
-import { DialogComponent } from "@/components/ui/dialog"
-import { ProductEditForm } from "@/components/forms/product-edit-form"
+
+interface ProductsTableProps {
+  products: Product[];
+  onDelete?: (productId: string) => void;
+  onUpdate?: (updatedProduct: Product) => void;
+}
 
 interface Column {
   header: string;
@@ -34,35 +40,40 @@ const columns: Column[] = [
     header: "Phase",
     accessorKey: "phase",
     cell: (product) => (
-      <span className={`px-2 py-1 rounded-full text-sm ${
-        getPhaseColor(product.phase)
-      }`}>
+      <span
+        className={`px-2 py-1 rounded-full text-sm ${getPhaseColor(
+          product.phase
+        )}`}
+      >
         {product.phase}
       </span>
     ),
-  }
+  },
 ];
 
 function getPhaseColor(phase: string) {
   switch (phase) {
-    case 'SWATCH':
-      return 'bg-blue-100 text-blue-800';
-    case 'INITIAL_SAMPLE':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'FIT_SAMPLE':
-      return 'bg-purple-100 text-purple-800';
-    case 'PRODUCTION_SAMPLE':
-      return 'bg-orange-100 text-orange-800';
-    case 'PRODUCTION':
-      return 'bg-green-100 text-green-800';
+    case "SWATCH":
+      return "bg-blue-100 text-blue-800";
+    case "INITIAL_SAMPLE":
+      return "bg-yellow-100 text-yellow-800";
+    case "FIT_SAMPLE":
+      return "bg-purple-100 text-purple-800";
+    case "PRODUCTION_SAMPLE":
+      return "bg-orange-100 text-orange-800";
+    case "PRODUCTION":
+      return "bg-green-100 text-green-800";
     default:
-      return 'bg-gray-100 text-gray-800';
+      return "bg-gray-100 text-gray-800";
   }
 }
 
-export function ProductsTable({ products: initialProducts }: { products: Product[] }) {
+export function ProductsTable({
+  products,
+  onDelete,
+  onUpdate,
+}: ProductsTableProps) {
   const router = useRouter();
-  const [products, setProducts] = useState(initialProducts);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -76,50 +87,27 @@ export function ProductsTable({ products: initialProducts }: { products: Product
 
     try {
       const response = await fetch(`/api/products/${selectedProduct.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(updatedProduct),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update product');
+        throw new Error("Failed to update product");
       }
 
       const updated = await response.json();
-      
-      // Update the local state with the new data
-      setProducts(products.map(p => 
-        p.id === updated.id ? updated : p
-      ));
-      
-      setIsEditDialogOpen(false);
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error('Error updating product:', error);
-    }
-  };
 
-  const handleDelete = async () => {
-    if (!selectedProduct) return;
-
-    try {
-      const response = await fetch(`/api/products/${selectedProduct.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete product");
+      if (onUpdate) {
+        onUpdate(updated);
       }
 
-      // Update local state by removing the deleted product
-      setProducts(products.filter(p => p.id !== selectedProduct.id));
       setIsEditDialogOpen(false);
       setSelectedProduct(null);
-      router.refresh(); // Refresh the page data
     } catch (error) {
-      console.error("Error deleting product:", error);
+      console.error("Error updating product:", error);
     }
   };
 
@@ -130,8 +118,8 @@ export function ProductsTable({ products: initialProducts }: { products: Product
           <thead>
             <tr className="border-b bg-gray-50">
               {columns.map((column) => (
-                <th 
-                  key={column.accessorKey} 
+                <th
+                  key={column.accessorKey}
                   className="px-4 py-2 text-left text-sm font-medium text-gray-500"
                 >
                   {column.header}
@@ -146,11 +134,11 @@ export function ProductsTable({ products: initialProducts }: { products: Product
             {products.map((product) => (
               <tr key={product.id} className="border-b hover:bg-gray-50">
                 {columns.map((column) => (
-                  <td 
+                  <td
                     key={`${product.id}-${column.accessorKey}`}
                     className="px-4 py-2 text-sm"
                   >
-                    {column.cell 
+                    {column.cell
                       ? column.cell(product)
                       : String(product[column.accessorKey as keyof Product])}
                   </td>
@@ -178,12 +166,13 @@ export function ProductsTable({ products: initialProducts }: { products: Product
         >
           <ProductEditForm
             product={selectedProduct}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSaveSuccess={handleSave}
+            onDeleteSuccess={onDelete}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedProduct(null);
             }}
+            mode="edit"
           />
         </DialogComponent>
       )}

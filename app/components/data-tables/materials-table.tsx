@@ -97,30 +97,6 @@ export function MaterialsTable({
     }
   };
 
-  // const handleDelete = async () => {
-  //   if (!selectedMaterial) return;
-
-  //   try {
-  //     const response = await fetch(`/api/materials/${selectedMaterial.id}`, {
-  //       method: "DELETE",
-  //     });
-
-  //     if (!response.ok) {
-  //       throw new Error("Failed to delete material");
-  //     }
-
-  //     // Call the onDelete callback if provided
-  //     if (onDelete) {
-  //       onDelete(selectedMaterial.id);
-  //     }
-
-  //     setIsEditDialogOpen(false);
-  //     setSelectedMaterial(null);
-  //   } catch (error) {
-  //     console.error("Error deleting material:", error);
-  //   }
-  // };
-
   return (
     <>
       <div className="rounded-md border">

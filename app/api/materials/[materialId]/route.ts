@@ -87,58 +87,85 @@ export async function PATCH(
     );
   }
 }
-// app/api/materials/[materialId]/route.ts
-// app/api/materials/[materialId]/route.ts
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { materialId: string } }
+  context: { params: Promise<{ materialId: string }> }
 ) {
   try {
-    const materialId = params.materialId;
+    console.log("----1");
+    // Await the params
+    const { materialId } = await context.params;
+    console.log("----2");
 
-    // Check if material is used in any products or orders
-    const materialInUse = await prisma.material.findFirst({
-      where: {
-        id: materialId,
-        OR: [
-          {
-            products: {
-              some: {}, // Check if used in any ProductMaterial
-            },
-          },
-          {
-            materialOrderItems: {
-              some: {}, // Check if used in any MaterialOrderItem
-            },
-          },
-        ],
-      },
-    });
-
-    if (materialInUse) {
+    if (!materialId) {
       return NextResponse.json(
-        {
-          message:
-            "Cannot delete material because it is in use. This material is referenced in products or orders. Remove these references before deleting.",
-        },
+        { message: "Material ID is required" },
         { status: 400 }
       );
     }
+    console.log("----3");
+    // Check if material exists
+    const existingMaterial = await prisma.material.findUnique({
+      where: { id: materialId },
+      include: {
+        _count: {
+          select: {
+            products: true,
+            materialOrderItems: true,
+          },
+        },
+      },
+    });
 
+    console.log("----4");
+
+    if (!existingMaterial) {
+      return NextResponse.json(
+        { message: "Material not found" },
+        { status: 404 }
+      );
+    }
+    console.log("----5");
+    // Check if material is used in any products or orders
+    if (
+      existingMaterial._count.products > 0 ||
+      existingMaterial._count.materialOrderItems > 0
+    ) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Cannot delete material because it is in use",
+          details: {
+            productsCount: existingMaterial._count.products,
+            ordersCount: existingMaterial._count.materialOrderItems,
+          },
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    console.log("----6");
+
+    // Delete the material
     await prisma.material.delete({
       where: {
         id: materialId,
       },
     });
 
-    return NextResponse.json({
-      message: "Material deleted successfully",
-    });
-  } catch (error) {
-    console.error("Error deleting material:", error);
     return NextResponse.json(
-      { message: "Failed to delete material" },
+      {
+        message: "Material deleted successfully",
+        deletedId: materialId,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error in DELETE API:", error);
+    return NextResponse.json(
+      {
+        message: "Failed to delete material",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

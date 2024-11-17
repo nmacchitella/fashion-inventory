@@ -27,18 +27,21 @@ export function InventoryControls({
         method: "DELETE",
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        // Get the error message from the API if available
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to delete material");
+        throw new Error(data.message || "Failed to delete material");
       }
 
+      // Only update the UI if deletion was successful
       setMaterials((prevMaterials) =>
         prevMaterials.filter((m) => m.id !== materialId)
       );
+
+      return data;
     } catch (error) {
       console.error("Error deleting material:", error);
-      throw error; // Propagate error to MaterialEditForm
+      throw error;
     }
   };
 

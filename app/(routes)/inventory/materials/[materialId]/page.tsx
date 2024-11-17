@@ -4,7 +4,6 @@ import { MaterialEditForm } from "@/components/forms/material-edit-form";
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/toast";
 import { Material } from "@/types/material";
 import { notFound, useRouter } from "next/navigation"; // Add this import
 import { use, useEffect, useState } from "react";
@@ -28,7 +27,6 @@ export default function MaterialPage({
   const resolvedParams = use(params);
   const [material, setMaterial] = useState<Material | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const { showToast } = useToast();
 
   useEffect(() => {
     getMaterial(resolvedParams.materialId).then(setMaterial);
@@ -38,16 +36,55 @@ export default function MaterialPage({
     return <div>Loading...</div>;
   }
 
-  // Handlers for successful operations
-  const handleSaveSuccess = (updatedMaterial: Material) => {
-    setMaterial(updatedMaterial);
-    setIsEditDialogOpen(false);
+  const handleSave = async (updatedMaterial: Partial<Material>) => {
+    try {
+      const response = await fetch(
+        `/api/materials/${resolvedParams.materialId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedMaterial),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update material");
+      }
+
+      const updated = await response.json();
+
+      setMaterial(updated);
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating material:", error);
+    }
   };
 
-  const handleDeleteSuccess = () => {
-    router.push("/inventory");
-    router.refresh();
+  const handleDelete = async (materialId: string) => {
+    try {
+      const response = await fetch(`/api/materials/${materialId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        // Get the error message from the API if available
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete material");
+      }
+      router.push("/inventory");
+      router.refresh();
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      throw error; // Propagate error to MaterialEditForm
+    }
   };
+
+  // const handleDeleteSuccess = () => {
+  //   router.push("/inventory");
+  //   router.refresh();
+  // };
 
   const detailItems = [
     { label: "Type", value: material.type },
@@ -107,12 +144,13 @@ export default function MaterialPage({
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         title="Edit Material"
-      >
+      > 
         <MaterialEditForm
           material={material}
-          onSaveSuccess={handleSaveSuccess}
-          onDeleteSuccess={handleDeleteSuccess}
+          onSaveSuccess={handleSave}
+          onDeleteSuccess={handleDelete}
           onCancel={() => setIsEditDialogOpen(false)}
+          mode="edit"
         />
       </DialogComponent>
     </>

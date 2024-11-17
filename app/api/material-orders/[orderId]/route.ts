@@ -1,14 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
-  _request: Request,
-  { params }: { params: { orderId: string } }
+  request: NextRequest,
+  context: { params: { orderId: string } }
 ) {
   try {
     const order = await prisma.materialOrder.findUnique({
       where: {
-        id: params.orderId,
+        id: context.params.orderId,
       },
       include: {
         orderItems: {
@@ -34,8 +34,8 @@ export async function GET(
 }
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { orderId: string } }
+  request: NextRequest,
+  context: { params: { orderId: string } }
 ) {
   try {
     const json = await request.json();
@@ -55,7 +55,7 @@ export async function PATCH(
 
     const order = await prisma.materialOrder.update({
       where: {
-        id: params.orderId,
+        id: context.params.orderId,
       },
       data: updateData,
       include: {
@@ -78,21 +78,21 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
-  { params }: { params: { orderId: string } }
+  request: NextRequest,
+  context: { params: { orderId: string } }
 ) {
   try {
     // First, delete all associated order items
     await prisma.materialOrderItem.deleteMany({
       where: {
-        orderId: params.orderId,
+        orderId: context.params.orderId,
       },
     });
 
     // Then delete the order itself
     await prisma.materialOrder.delete({
       where: {
-        id: params.orderId,
+        id: context.params.orderId,
       },
     });
 
