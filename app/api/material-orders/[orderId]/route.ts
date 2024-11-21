@@ -83,24 +83,29 @@ export async function DELETE(
 ) {
   try {
     // First, delete all associated order items
-    await prisma.materialOrderItem.deleteMany({
+    const deletedItems = await prisma.materialOrderItem.deleteMany({
       where: {
         orderId: context.params.orderId,
       },
     });
+    console.log("Deleted order items:", deletedItems);
 
     // Then delete the order itself
-    await prisma.materialOrder.delete({
+    const deletedOrder = await prisma.materialOrder.delete({
       where: {
         id: context.params.orderId,
       },
     });
+    console.log("Deleted order:", deletedOrder);
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Detailed error in DELETE API:", error);
     return NextResponse.json(
-      { error: "Error deleting order" },
+      {
+        message: "Failed to delete order",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

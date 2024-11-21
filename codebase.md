@@ -443,18 +443,21 @@ export function InventoryControls({
         method: "DELETE",
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        // Get the error message from the API if available
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to delete material");
+        throw new Error(data.message || "Failed to delete material");
       }
 
+      // Only update the UI if deletion was successful
       setMaterials((prevMaterials) =>
         prevMaterials.filter((m) => m.id !== materialId)
       );
+
+      return data;
     } catch (error) {
       console.error("Error deleting material:", error);
-      throw error; // Propagate error to MaterialEditForm
+      throw error;
     }
   };
 
@@ -515,7 +518,6 @@ import { MaterialEditForm } from "@/components/forms/material-edit-form";
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/toast";
 import { Material } from "@/types/material";
 import { notFound, useRouter } from "next/navigation"; // Add this import
 import { use, useEffect, useState } from "react";
@@ -539,7 +541,6 @@ export default function MaterialPage({
   const resolvedParams = use(params);
   const [material, setMaterial] = useState<Material | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const { showToast } = useToast();
 
   useEffect(() => {
     getMaterial(resolvedParams.materialId).then(setMaterial);
@@ -549,16 +550,55 @@ export default function MaterialPage({
     return <div>Loading...</div>;
   }
 
-  // Handlers for successful operations
-  const handleSaveSuccess = (updatedMaterial: Material) => {
-    setMaterial(updatedMaterial);
-    setIsEditDialogOpen(false);
+  const handleSave = async (updatedMaterial: Partial<Material>) => {
+    try {
+      const response = await fetch(
+        `/api/materials/${resolvedParams.materialId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedMaterial),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update material");
+      }
+
+      const updated = await response.json();
+
+      setMaterial(updated);
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating material:", error);
+    }
   };
 
-  const handleDeleteSuccess = () => {
-    router.push("/inventory");
-    router.refresh();
+  const handleDelete = async (materialId: string) => {
+    try {
+      const response = await fetch(`/api/materials/${materialId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        // Get the error message from the API if available
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete material");
+      }
+      router.push("/inventory");
+      router.refresh();
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      throw error; // Propagate error to MaterialEditForm
+    }
   };
+
+  // const handleDeleteSuccess = () => {
+  //   router.push("/inventory");
+  //   router.refresh();
+  // };
 
   const detailItems = [
     { label: "Type", value: material.type },
@@ -618,12 +658,13 @@ export default function MaterialPage({
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         title="Edit Material"
-      >
+      > 
         <MaterialEditForm
           material={material}
-          onSaveSuccess={handleSaveSuccess}
-          onDeleteSuccess={handleDeleteSuccess}
+          onSaveSuccess={handleSave}
+          onDeleteSuccess={handleDelete}
           onCancel={() => setIsEditDialogOpen(false)}
+          mode="edit"
         />
       </DialogComponent>
     </>
@@ -891,57 +932,134 @@ export default function MaterialOrdersLoading() {
 
 ```
 
-# app/(routes)/operations/material-orders/page.tsx
+# app/(routes)/operations/material-orders/material-orders-controls.tsx
 
 ```tsx
+"use client";
+
 import { MaterialOrdersTable } from "@/components/data-tables/materials-orders-table";
-import { prisma } from "@/lib/prisma";
-import { MaterialOrder, MaterialOrderItem, OrderStatus, MeasurementUnit } from "@/types/materialOrder";
+import { AddMaterialOrderDialog } from "@/components/forms/add-material-order-dialog";
+import { MaterialOrder } from "@/types/materialOrder";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-async function getMaterialOrders(): Promise<MaterialOrder[]> {
-  const orders = await prisma.materialOrder.findMany({
-    include: {
-      orderItems: true,
-    },
-  });
-
-  // Convert Prisma types to our custom types
-  return orders.map(order => ({
-    ...order,
-    orderDate: new Date(order.orderDate),
-    expectedDelivery: new Date(order.expectedDelivery),
-    actualDelivery: order.actualDelivery ? new Date(order.actualDelivery) : undefined,
-    status: order.status as OrderStatus,
-    notes: order.notes || undefined, // Convert null to undefined
-    orderItems: order.orderItems.map(item => ({
-      ...item,
-      unit: item.unit as MeasurementUnit,
-      notes: item.notes || undefined, // Convert null to undefined
-      createdAt: new Date(item.createdAt),
-      updatedAt: new Date(item.updatedAt)
-    })) as MaterialOrderItem[],
-    createdAt: new Date(order.createdAt),
-    updatedAt: new Date(order.updatedAt)
-  }));
+interface MaterialOrdersControlsProps {
+  initialOrders: MaterialOrder[];
 }
 
-export default async function MaterialOrdersPage() {
-  const orders = await getMaterialOrders();
+export function MaterialOrdersControls({
+  initialOrders,
+}: MaterialOrdersControlsProps) {
+  const router = useRouter();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [orders, setOrders] = useState(initialOrders);
+
+  const handleAddSuccess = (newOrder: MaterialOrder) => {
+    console.log("New order before setState:", newOrder);
+    setOrders((prevOrders) => {
+      console.log("Previous orders:", prevOrders);
+      const newOrders = [newOrder, ...prevOrders];
+      console.log("New orders array:", newOrders);
+      return newOrders;
+    });
+    setIsAddDialogOpen(false);
+    router.refresh(); // Refresh server-side data
+  };
+
+  const handleDelete = async (orderId: string) => {
+    try {
+      const response = await fetch(`/api/material-orders/${orderId}`, {
+        method: "DELETE",
+      });
+
+      // Since we're returning 204 No Content, we shouldn't try to parse the response
+      if (response.status === 204) {
+        setOrders((prevOrders) => prevOrders.filter((o) => o.id !== orderId));
+        router.refresh(); // Refresh server-side data
+        return; // Exit early on success
+      }
+
+      // If we got a different status, try to get error details
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to delete order");
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      // Instead of re-throwing the error, we could show a toast notification
+      throw new Error(
+        "Failed to delete order: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+    }
+  };
+
+  const handleUpdate = (updatedOrder: MaterialOrder) => {
+    setOrders((prevOrders) =>
+      prevOrders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+    );
+    router.refresh(); // Refresh server-side data
+  };
 
   return (
-    <div className="space-y-4">
+    <>
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Material Orders</h1>
-        <button className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">
+        <button
+          onClick={() => setIsAddDialogOpen(true)}
+          className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+        >
           Add Material Order
         </button>
       </div>
 
-      <MaterialOrdersTable orders={orders} />
-    </div>
+      <MaterialOrdersTable
+        orders={orders}
+        onDelete={handleDelete}
+        onUpdate={handleUpdate}
+      />
+
+      <AddMaterialOrderDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSuccess={handleAddSuccess}
+      />
+    </>
   );
 }
 
+```
+
+# app/(routes)/operations/material-orders/page.tsx
+
+```tsx
+// app/routes/operations/material-orders/page.tsx
+import { prisma } from "@/lib/prisma";
+import { MaterialOrdersControls } from "./material-orders-controls";
+
+async function getMaterialOrders() {
+  const orders = await prisma.materialOrder.findMany({
+    include: {
+      orderItems: {
+        include: {
+          material: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+  return orders;
+}
+
+export default async function MaterialOrdersPage() {
+  const initialOrders = await getMaterialOrders();
+
+  return (
+    <div className="space-y-4">
+      <MaterialOrdersControls initialOrders={initialOrders} />
+    </div>
+  );
+}
 ```
 
 # app/(routes)/operations/page.tsx
@@ -1174,9 +1292,10 @@ export default function ProductPage({
         >
           <ProductEditForm
             product={product}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSaveSuccess={handleSave}
+            onDeleteSuccess={handleDelete}
             onCancel={() => setIsEditDialogOpen(false)}
+            mode="edit"
           />
         </DialogComponent>
       )}
@@ -1299,7 +1418,7 @@ export function ProductsControls({ initialProducts }: ProductsControlsProps) {
           Add Product
         </button>
       </div>
-
+ 
       <ProductsTable
         products={products}
         onDelete={handleDelete}
@@ -1373,16 +1492,16 @@ export async function GET() {
 
 ```ts
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
-  _request: Request,
-  { params }: { params: { orderId: string } }
+  request: NextRequest,
+  context: { params: { orderId: string } }
 ) {
   try {
     const order = await prisma.materialOrder.findUnique({
       where: {
-        id: params.orderId,
+        id: context.params.orderId,
       },
       include: {
         orderItems: {
@@ -1408,8 +1527,8 @@ export async function GET(
 }
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { orderId: string } }
+  request: NextRequest,
+  context: { params: { orderId: string } }
 ) {
   try {
     const json = await request.json();
@@ -1429,7 +1548,7 @@ export async function PATCH(
 
     const order = await prisma.materialOrder.update({
       where: {
-        id: params.orderId,
+        id: context.params.orderId,
       },
       data: updateData,
       include: {
@@ -1452,29 +1571,34 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
-  { params }: { params: { orderId: string } }
+  request: NextRequest,
+  context: { params: { orderId: string } }
 ) {
   try {
     // First, delete all associated order items
-    await prisma.materialOrderItem.deleteMany({
+    const deletedItems = await prisma.materialOrderItem.deleteMany({
       where: {
-        orderId: params.orderId,
+        orderId: context.params.orderId,
       },
     });
+    console.log("Deleted order items:", deletedItems);
 
     // Then delete the order itself
-    await prisma.materialOrder.delete({
+    const deletedOrder = await prisma.materialOrder.delete({
       where: {
-        id: params.orderId,
+        id: context.params.orderId,
       },
     });
+    console.log("Deleted order:", deletedOrder);
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Detailed error in DELETE API:", error);
     return NextResponse.json(
-      { error: "Error deleting order" },
+      {
+        message: "Failed to delete order",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -1657,58 +1781,85 @@ export async function PATCH(
     );
   }
 }
-// app/api/materials/[materialId]/route.ts
-// app/api/materials/[materialId]/route.ts
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { materialId: string } }
+  context: { params: Promise<{ materialId: string }> }
 ) {
   try {
-    const materialId = params.materialId;
+    console.log("----1");
+    // Await the params
+    const { materialId } = await context.params;
+    console.log("----2");
 
-    // Check if material is used in any products or orders
-    const materialInUse = await prisma.material.findFirst({
-      where: {
-        id: materialId,
-        OR: [
-          {
-            products: {
-              some: {}, // Check if used in any ProductMaterial
-            },
-          },
-          {
-            materialOrderItems: {
-              some: {}, // Check if used in any MaterialOrderItem
-            },
-          },
-        ],
-      },
-    });
-
-    if (materialInUse) {
+    if (!materialId) {
       return NextResponse.json(
-        {
-          message:
-            "Cannot delete material because it is in use. This material is referenced in products or orders. Remove these references before deleting.",
-        },
+        { message: "Material ID is required" },
         { status: 400 }
       );
     }
+    console.log("----3");
+    // Check if material exists
+    const existingMaterial = await prisma.material.findUnique({
+      where: { id: materialId },
+      include: {
+        _count: {
+          select: {
+            products: true,
+            materialOrderItems: true,
+          },
+        },
+      },
+    });
 
+    console.log("----4");
+
+    if (!existingMaterial) {
+      return NextResponse.json(
+        { message: "Material not found" },
+        { status: 404 }
+      );
+    }
+    console.log("----5");
+    // Check if material is used in any products or orders
+    if (
+      existingMaterial._count.products > 0 ||
+      existingMaterial._count.materialOrderItems > 0
+    ) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Cannot delete material because it is in use",
+          details: {
+            productsCount: existingMaterial._count.products,
+            ordersCount: existingMaterial._count.materialOrderItems,
+          },
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    console.log("----6");
+
+    // Delete the material
     await prisma.material.delete({
       where: {
         id: materialId,
       },
     });
 
-    return NextResponse.json({
-      message: "Material deleted successfully",
-    });
-  } catch (error) {
-    console.error("Error deleting material:", error);
     return NextResponse.json(
-      { message: "Failed to delete material" },
+      {
+        message: "Material deleted successfully",
+        deletedId: materialId,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error in DELETE API:", error);
+    return NextResponse.json(
+      {
+        message: "Failed to delete material",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -1822,9 +1973,11 @@ export async function GET(
   { params }: { params: { productId: string } }
 ) {
   try {
+    const productId = params.productId;
+
     const product = await prisma.product.findUnique({
       where: {
-        id: params.productId,
+        id: productId,
       },
       include: {
         materials: {
@@ -1855,10 +2008,11 @@ export async function PATCH(
 ) {
   try {
     const json = await request.json();
+    const productId = params.productId;
 
     const product = await prisma.product.update({
       where: {
-        id: params.productId,
+        id: productId,
       },
       data: json,
     });
@@ -1877,18 +2031,20 @@ export async function DELETE(
   { params }: { params: { productId: string } }
 ) {
   try {
-    console.log("Attempting to delete product:", params.productId);
+    const productId = params.productId;
+
+    console.log("Attempting to delete product:", productId);
 
     // First check if product exists
     const product = await prisma.product.findUnique({
-      where: { id: params.productId },
+      where: { id: productId },
       include: {
         materials: true,
       },
     });
 
     if (!product) {
-      console.log("Product not found:", params.productId);
+      console.log("Product not found:", productId);
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
@@ -1897,14 +2053,14 @@ export async function DELETE(
       // First delete all product-material relationships
       await tx.productMaterial.deleteMany({
         where: {
-          productId: params.productId,
+          productId: productId,
         },
       });
 
       // Then delete the product
       await tx.product.delete({
         where: {
-          id: params.productId,
+          id: productId,
         },
       });
     });
@@ -1912,9 +2068,10 @@ export async function DELETE(
     console.log("Product and related records deleted successfully");
     return NextResponse.json({
       message: "Product deleted successfully",
-      id: params.productId,
+      id: productId,
     });
   } catch (error) {
+    console.log("hello");
     console.error("Error during product deletion:", error);
     return NextResponse.json(
       {
@@ -1994,16 +2151,15 @@ export async function POST(request: Request) {
 # app/api/stylematerial/route.ts
 
 ```ts
-import { prisma } from "@/app/lib/prisma";
-import { NextResponse } from "next/server";
-
+// import { prisma } from "@/app/lib/prisma";
+// import { NextResponse } from "next/server";
 
 ```
 
 # app/api/styles/route.ts
 
 ```ts
-import { prisma } from "@/app/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -2200,12 +2356,12 @@ const columns: Column[] = [
   {
     header: "Order Date",
     accessorKey: "orderDate",
-    cell: (order) => order.orderDate.toLocaleDateString(),
+    cell: (order) => new Date(order.orderDate).toLocaleDateString(),
   },
   {
     header: "Expected Delivery",
     accessorKey: "expectedDelivery",
-    cell: (order) => order.expectedDelivery.toLocaleDateString(),
+    cell: (order) => new Date(order.expectedDelivery).toLocaleDateString(),
   },
   {
     header: "Status",
@@ -2239,13 +2395,18 @@ function getStatusColor(status: OrderStatus) {
   }
 }
 
-export function MaterialOrdersTable({
-  orders: initialOrders,
-}: {
+interface MaterialOrdersTableProps {
   orders: MaterialOrder[];
-}) {
+  onUpdate: (order: MaterialOrder) => void;
+  onDelete: (orderId: string) => void;
+}
+
+export function MaterialOrdersTable({
+  orders,
+  onUpdate,
+  onDelete,
+}: MaterialOrdersTableProps) {
   const router = useRouter();
-  const [orders, setOrders] = useState(initialOrders);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<MaterialOrder | null>(
     null
@@ -2256,39 +2417,36 @@ export function MaterialOrdersTable({
     setIsEditDialogOpen(true);
   };
 
-  const handleSave = async (updatedOrder: Partial<MaterialOrder>) => {
-    if (!selectedOrder) return;
-
+  const handleSaveSuccess = async (updatedOrder: MaterialOrder) => {
     try {
-      const response = await fetch(`/api/material-orders/${selectedOrder.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedOrder),
-      });
+      const response = await fetch(
+        `/api/material-orders/${selectedOrder?.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedOrder),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to update order");
       }
 
       const updated = await response.json();
-
-      // Update the local state with the new data
-      setOrders(orders.map((o) => (o.id === updated.id ? updated : o)));
-
+      onUpdate(updated);
       setIsEditDialogOpen(false);
       setSelectedOrder(null);
+      router.refresh();
     } catch (error) {
       console.error("Error updating order:", error);
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedOrder) return;
-
+  const handleDeleteSuccess = async (orderId: string) => {
     try {
-      const response = await fetch(`/api/material-orders/${selectedOrder.id}`, {
+      const response = await fetch(`/api/material-orders/${orderId}`, {
         method: "DELETE",
       });
 
@@ -2296,13 +2454,13 @@ export function MaterialOrdersTable({
         throw new Error("Failed to delete order");
       }
 
-      // Update local state by removing the deleted order
-      setOrders(orders.filter((o) => o.id !== selectedOrder.id));
+      onDelete(orderId);
       setIsEditDialogOpen(false);
       setSelectedOrder(null);
-      router.refresh(); // Refresh the page data
+      router.refresh();
     } catch (error) {
       console.error("Error deleting order:", error);
+      throw error;
     }
   };
 
@@ -2357,7 +2515,7 @@ export function MaterialOrdersTable({
       {selectedOrder && (
         <DialogComponent
           open={isEditDialogOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setIsEditDialogOpen(open);
             if (!open) setSelectedOrder(null);
           }}
@@ -2365,8 +2523,8 @@ export function MaterialOrdersTable({
         >
           <MaterialOrderEditForm
             order={selectedOrder}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSaveSuccess={handleSaveSuccess}
+            onDeleteSuccess={handleDeleteSuccess}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedOrder(null);
@@ -2816,6 +2974,85 @@ export function AddMaterialDialog({
 
 ```
 
+# app/components/forms/add-material-order-dialog.tsx
+
+```tsx
+"use client";
+
+import { MaterialOrderEditForm } from "@/components/forms/material-order-edit-form";
+import { DialogComponent } from "@/components/ui/dialog";
+import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
+import { useRouter } from "next/navigation";
+
+interface AddMaterialOrderDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (order: MaterialOrder) => void;
+}
+
+const defaultOrder: Omit<MaterialOrder, "id" | "createdAt" | "updatedAt"> = {
+  orderNumber: "",
+  supplier: "",
+  orderItems: [],
+  totalPrice: 0,
+  currency: "USD",
+  orderDate: new Date(),
+  expectedDelivery: new Date(),
+  actualDelivery: undefined,
+  status: OrderStatus.PENDING,
+  notes: "",
+};
+
+export function AddMaterialOrderDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: AddMaterialOrderDialogProps) {
+  const router = useRouter();
+
+  const handleSave = async (orderData: Partial<MaterialOrder>) => {
+    try {
+      const response = await fetch("/api/material-orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create order");
+      }
+
+      const newOrder = await response.json();
+      onSuccess(newOrder);
+      onOpenChange(false);
+      router.refresh(); // Refresh server-side data
+    } catch (error) {
+      console.error("Error creating order:", error);
+      throw error;
+    }
+  };
+
+  return (
+    <DialogComponent
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Add New Material Order"
+    >
+      <MaterialOrderEditForm
+        order={defaultOrder as MaterialOrder}
+        onSaveSuccess={handleSave}
+        onCancel={() => onOpenChange(false)}
+        mode="create"
+      />
+    </DialogComponent>
+  );
+}
+
+```
+
 # app/components/forms/add-product-dialog.tsx
 
 ```tsx
@@ -2876,7 +3113,7 @@ export function AddProductDialog({
     >
       <ProductEditForm
         product={defaultProduct as Product}
-        onSave={handleSave}
+        onSaveSuccess={handleSave}
         onCancel={() => onOpenChange(false)}
         mode="create"
       />
@@ -3186,14 +3423,16 @@ export function MaterialEditForm({
 "use client";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
 import { useState } from "react";
 
 interface MaterialOrderEditFormProps {
   order: MaterialOrder;
-  onSave: (updatedOrder: Partial<MaterialOrder>) => Promise<void>;
-  onDelete: () => Promise<void>;
+  onSaveSuccess: (updatedOrder: MaterialOrder) => void;
+  onDeleteSuccess?: (orderId: string) => Promise<void>;
   onCancel: () => void;
+  mode?: "edit" | "create";
 }
 
 // Helper function to safely format dates
@@ -3207,9 +3446,10 @@ const formatDate = (date: Date | string | null | undefined) => {
 
 export function MaterialOrderEditForm({
   order,
-  onSave,
-  onDelete,
+  onSaveSuccess,
+  onDeleteSuccess,
   onCancel,
+  mode = "edit",
 }: MaterialOrderEditFormProps) {
   const [formData, setFormData] = useState({
     orderNumber: order.orderNumber,
@@ -3223,6 +3463,7 @@ export function MaterialOrderEditForm({
     notes: order.notes || "",
   });
 
+  const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -3231,7 +3472,7 @@ export function MaterialOrderEditForm({
     e.preventDefault();
     setIsSaving(true);
     try {
-      await onSave({
+      const processedData = {
         ...formData,
         totalPrice: parseFloat(formData.totalPrice.toString()),
         orderDate: new Date(formData.orderDate),
@@ -3239,20 +3480,36 @@ export function MaterialOrderEditForm({
         actualDelivery: formData.actualDelivery
           ? new Date(formData.actualDelivery)
           : null,
-      });
+      };
+
+      onSaveSuccess(processedData as MaterialOrder);
+      showToast(
+        `Order ${mode === "create" ? "created" : "updated"} successfully`,
+        "success"
+      );
     } catch (error) {
-      console.error("Error saving order:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to save order",
+        "error"
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
+    if (!onDeleteSuccess) return;
     setIsDeleting(true);
     try {
-      await onDelete();
+      await onDeleteSuccess(order.id);
+      showToast("Order deleted successfully", "success");
+      onCancel();
     } catch (error) {
-      console.error("Error deleting order:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete order",
+        "error"
+      );
+    } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -3276,6 +3533,7 @@ export function MaterialOrderEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3290,6 +3548,7 @@ export function MaterialOrderEditForm({
                 setFormData((prev) => ({ ...prev, supplier: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3304,6 +3563,7 @@ export function MaterialOrderEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             >
               {Object.values(OrderStatus).map((status) => (
                 <option key={status} value={status}>
@@ -3329,6 +3589,7 @@ export function MaterialOrderEditForm({
                   }))
                 }
                 className="flex-1 px-3 py-2 border rounded-md"
+                required
               />
               <input
                 type="text"
@@ -3338,6 +3599,7 @@ export function MaterialOrderEditForm({
                 }
                 className="w-20 px-3 py-2 border rounded-md"
                 placeholder="USD"
+                required
               />
             </div>
           </div>
@@ -3353,6 +3615,7 @@ export function MaterialOrderEditForm({
                 setFormData((prev) => ({ ...prev, orderDate: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3370,6 +3633,7 @@ export function MaterialOrderEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -3404,14 +3668,16 @@ export function MaterialOrderEditForm({
         </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
-          >
-            Delete Order
-          </button>
-          <div className="flex gap-3">
+          {mode === "edit" && onDeleteSuccess && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+            >
+              Delete Order
+            </button>
+          )}
+          <div className="flex gap-3 ml-auto">
             <button
               type="button"
               onClick={onCancel}
@@ -3424,21 +3690,29 @@ export function MaterialOrderEditForm({
               disabled={isSaving}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving
+                ? mode === "create"
+                  ? "Creating..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create Order"
+                : "Save Changes"}
             </button>
           </div>
         </div>
       </form>
 
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        title="Delete Order"
-        description="Are you sure you want to delete this order? This action cannot be undone."
-        onConfirm={handleDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-        isLoading={isDeleting}
-      />
+      {mode === "edit" && onDeleteSuccess && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="Delete Order"
+          description="Are you sure you want to delete this order? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          isLoading={isDeleting}
+        />
+      )}
     </>
   );
 }

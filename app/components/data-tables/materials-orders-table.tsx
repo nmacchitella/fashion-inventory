@@ -30,12 +30,12 @@ const columns: Column[] = [
   {
     header: "Order Date",
     accessorKey: "orderDate",
-    cell: (order) => order.orderDate.toLocaleDateString(),
+    cell: (order) => new Date(order.orderDate).toLocaleDateString(),
   },
   {
     header: "Expected Delivery",
     accessorKey: "expectedDelivery",
-    cell: (order) => order.expectedDelivery.toLocaleDateString(),
+    cell: (order) => new Date(order.expectedDelivery).toLocaleDateString(),
   },
   {
     header: "Status",
@@ -69,13 +69,18 @@ function getStatusColor(status: OrderStatus) {
   }
 }
 
-export function MaterialOrdersTable({
-  orders: initialOrders,
-}: {
+interface MaterialOrdersTableProps {
   orders: MaterialOrder[];
-}) {
+  onUpdate: (order: MaterialOrder) => void;
+  onDelete: (orderId: string) => void;
+}
+
+export function MaterialOrdersTable({
+  orders,
+  onUpdate,
+  onDelete,
+}: MaterialOrdersTableProps) {
   const router = useRouter();
-  const [orders, setOrders] = useState(initialOrders);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<MaterialOrder | null>(
     null
@@ -86,39 +91,36 @@ export function MaterialOrdersTable({
     setIsEditDialogOpen(true);
   };
 
-  const handleSave = async (updatedOrder: Partial<MaterialOrder>) => {
-    if (!selectedOrder) return;
-
+  const handleSaveSuccess = async (updatedOrder: MaterialOrder) => {
     try {
-      const response = await fetch(`/api/material-orders/${selectedOrder.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedOrder),
-      });
+      const response = await fetch(
+        `/api/material-orders/${selectedOrder?.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedOrder),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to update order");
       }
 
       const updated = await response.json();
-
-      // Update the local state with the new data
-      setOrders(orders.map((o) => (o.id === updated.id ? updated : o)));
-
+      onUpdate(updated);
       setIsEditDialogOpen(false);
       setSelectedOrder(null);
+      router.refresh();
     } catch (error) {
       console.error("Error updating order:", error);
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedOrder) return;
-
+  const handleDeleteSuccess = async (orderId: string) => {
     try {
-      const response = await fetch(`/api/material-orders/${selectedOrder.id}`, {
+      const response = await fetch(`/api/material-orders/${orderId}`, {
         method: "DELETE",
       });
 
@@ -126,13 +128,13 @@ export function MaterialOrdersTable({
         throw new Error("Failed to delete order");
       }
 
-      // Update local state by removing the deleted order
-      setOrders(orders.filter((o) => o.id !== selectedOrder.id));
+      onDelete(orderId);
       setIsEditDialogOpen(false);
       setSelectedOrder(null);
-      router.refresh(); // Refresh the page data
+      router.refresh();
     } catch (error) {
       console.error("Error deleting order:", error);
+      throw error;
     }
   };
 
@@ -187,7 +189,7 @@ export function MaterialOrdersTable({
       {selectedOrder && (
         <DialogComponent
           open={isEditDialogOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             setIsEditDialogOpen(open);
             if (!open) setSelectedOrder(null);
           }}
@@ -195,8 +197,8 @@ export function MaterialOrdersTable({
         >
           <MaterialOrderEditForm
             order={selectedOrder}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSaveSuccess={handleSaveSuccess}
+            onDeleteSuccess={handleDeleteSuccess}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedOrder(null);

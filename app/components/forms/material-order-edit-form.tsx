@@ -1,14 +1,16 @@
 "use client";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
 import { useState } from "react";
 
 interface MaterialOrderEditFormProps {
   order: MaterialOrder;
-  onSave: (updatedOrder: Partial<MaterialOrder>) => Promise<void>;
-  onDelete: () => Promise<void>;
+  onSaveSuccess: (updatedOrder: MaterialOrder) => void;
+  onDeleteSuccess?: (orderId: string) => Promise<void>;
   onCancel: () => void;
+  mode?: "edit" | "create";
 }
 
 // Helper function to safely format dates
@@ -22,9 +24,10 @@ const formatDate = (date: Date | string | null | undefined) => {
 
 export function MaterialOrderEditForm({
   order,
-  onSave,
-  onDelete,
+  onSaveSuccess,
+  onDeleteSuccess,
   onCancel,
+  mode = "edit",
 }: MaterialOrderEditFormProps) {
   const [formData, setFormData] = useState({
     orderNumber: order.orderNumber,
@@ -38,6 +41,7 @@ export function MaterialOrderEditForm({
     notes: order.notes || "",
   });
 
+  const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -46,7 +50,7 @@ export function MaterialOrderEditForm({
     e.preventDefault();
     setIsSaving(true);
     try {
-      await onSave({
+      const processedData = {
         ...formData,
         totalPrice: parseFloat(formData.totalPrice.toString()),
         orderDate: new Date(formData.orderDate),
@@ -54,20 +58,36 @@ export function MaterialOrderEditForm({
         actualDelivery: formData.actualDelivery
           ? new Date(formData.actualDelivery)
           : null,
-      });
+      };
+
+      onSaveSuccess(processedData as MaterialOrder);
+      showToast(
+        `Order ${mode === "create" ? "created" : "updated"} successfully`,
+        "success"
+      );
     } catch (error) {
-      console.error("Error saving order:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to save order",
+        "error"
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
+    if (!onDeleteSuccess) return;
     setIsDeleting(true);
     try {
-      await onDelete();
+      await onDeleteSuccess(order.id);
+      showToast("Order deleted successfully", "success");
+      onCancel();
     } catch (error) {
-      console.error("Error deleting order:", error);
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete order",
+        "error"
+      );
+    } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
@@ -91,6 +111,7 @@ export function MaterialOrderEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -105,6 +126,7 @@ export function MaterialOrderEditForm({
                 setFormData((prev) => ({ ...prev, supplier: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -119,6 +141,7 @@ export function MaterialOrderEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             >
               {Object.values(OrderStatus).map((status) => (
                 <option key={status} value={status}>
@@ -144,6 +167,7 @@ export function MaterialOrderEditForm({
                   }))
                 }
                 className="flex-1 px-3 py-2 border rounded-md"
+                required
               />
               <input
                 type="text"
@@ -153,6 +177,7 @@ export function MaterialOrderEditForm({
                 }
                 className="w-20 px-3 py-2 border rounded-md"
                 placeholder="USD"
+                required
               />
             </div>
           </div>
@@ -168,6 +193,7 @@ export function MaterialOrderEditForm({
                 setFormData((prev) => ({ ...prev, orderDate: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -185,6 +211,7 @@ export function MaterialOrderEditForm({
                 }))
               }
               className="w-full px-3 py-2 border rounded-md"
+              required
             />
           </div>
 
@@ -219,14 +246,16 @@ export function MaterialOrderEditForm({
         </div>
 
         <div className="flex justify-between border-t pt-6 mt-6">
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
-          >
-            Delete Order
-          </button>
-          <div className="flex gap-3">
+          {mode === "edit" && onDeleteSuccess && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+            >
+              Delete Order
+            </button>
+          )}
+          <div className="flex gap-3 ml-auto">
             <button
               type="button"
               onClick={onCancel}
@@ -239,21 +268,29 @@ export function MaterialOrderEditForm({
               disabled={isSaving}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving
+                ? mode === "create"
+                  ? "Creating..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create Order"
+                : "Save Changes"}
             </button>
           </div>
         </div>
       </form>
 
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        title="Delete Order"
-        description="Are you sure you want to delete this order? This action cannot be undone."
-        onConfirm={handleDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-        isLoading={isDeleting}
-      />
+      {mode === "edit" && onDeleteSuccess && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="Delete Order"
+          description="Are you sure you want to delete this order? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          isLoading={isDeleting}
+        />
+      )}
     </>
   );
 }
