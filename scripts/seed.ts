@@ -1,22 +1,80 @@
-// scripts/seed.ts
-import { PrismaClient } from "@prisma/client";
-import { ContactType } from "../app/types/contact";
-import { MeasurementUnit, OrderStatus } from "../app/types/materialOrder";
+import {
+  ContactType,
+  MeasurementUnit,
+  MovementType,
+  OrderStatus,
+  Phase,
+  PrismaClient,
+  Role,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// Sample data arrays
+const users = [
+  {
+    email: "admin@company.com",
+    name: "Admin User",
+    role: Role.ADMIN,
+  },
+  {
+    email: "production@company.com",
+    name: "Production Manager",
+    role: Role.PRODUCTION_MANAGER,
+  },
+  {
+    email: "inventory@company.com",
+    name: "Inventory Manager",
+    role: Role.INVENTORY_MANAGER,
+  },
+  {
+    email: "user@company.com",
+    name: "Regular User",
+    role: Role.USER,
+  },
+];
+
 const materials = [
-  { color: "Linen White", colorCode: "2071" },
-  { color: "Linen AAA", colorCode: "2571" },
-  { color: "Navy Blue", colorCode: "2108" },
-  { color: "Orange", colorCode: "2088" },
-  { color: "Pink", colorCode: "2102" },
-  { color: "Yellow", colorCode: "2091" },
-  { color: "Almond", colorCode: "2072" },
-  { color: "Black", colorCode: "2094" },
-  { color: "Cerulean Blue", colorCode: "2098" },
-  { color: "Dark Green", colorCode: "2095" },
-  { color: "Light Green", colorCode: "2083" },
+  {
+    type: "Cotton",
+    color: "Linen White",
+    colorCode: "2071",
+    brand: "Campolmi",
+    defaultUnit: MeasurementUnit.KILOGRAM,
+    defaultCostPerUnit: 25.0,
+    currency: "EUR",
+    notes: "30/2x4x4",
+  },
+  {
+    type: "Cotton",
+    color: "Navy Blue",
+    colorCode: "2108",
+    brand: "Campolmi",
+    defaultUnit: MeasurementUnit.KILOGRAM,
+    defaultCostPerUnit: 28.0,
+    currency: "EUR",
+    notes: "30/2x4x4",
+  },
+  {
+    type: "Cotton",
+    color: "Black",
+    colorCode: "2094",
+    brand: "Campolmi",
+    defaultUnit: MeasurementUnit.KILOGRAM,
+    defaultCostPerUnit: 26.0,
+    currency: "EUR",
+    notes: "30/2x4x4",
+  },
+  {
+    type: "Linen",
+    color: "Natural",
+    colorCode: "L001",
+    brand: "European Linen",
+    defaultUnit: MeasurementUnit.METER,
+    defaultCostPerUnit: 15.0,
+    currency: "EUR",
+    notes: "100% European Linen",
+  },
 ];
 
 const products = [
@@ -24,51 +82,25 @@ const products = [
     piece: "Scrunchie with Picot Trim",
     name: "Classic",
     sku: "SCRUNCH-PICOT-001",
+    season: "SS24",
+    phase: Phase.PRODUCTION,
+    notes: "Best seller",
   },
-  { piece: "Bracelet", name: "Classic", sku: "BRACE-CLASS-001" },
-  { piece: "Bandana", name: "Classic", sku: "BAND-CLASS-001" },
-  { piece: "Bucket Hat", name: "Classic", sku: "BUCKET-CLASS-001" },
-  { piece: "Wide Brim Sun Hat", name: "Classic", sku: "WBRIM-CLASS-001" },
-  { piece: "Wide Brim Sun Hat", name: "Stripes", sku: "WBRIM-STRIP-001" },
-  { piece: "Shell Sun Hat", name: "Classic", sku: "SHELL-CLASS-001" },
-  { piece: "Shell Sun Hat", name: "Stripes", sku: "SHELL-STRIP-001" },
   {
-    piece: "Scallop Edge Bucket Hat",
+    piece: "Bucket Hat",
     name: "Classic",
-    sku: "SCALBUCK-CLASS-001",
-  },
-];
-
-const materialOrders = [
-  {
-    orderNumber: "MO-2024-001",
-    supplier: "Campolmi Florence",
-    totalPrice: 2500.0,
-    currency: "EUR",
-    orderDate: new Date("2024-01-15"),
-    expectedDelivery: new Date("2024-02-15"),
-    status: OrderStatus.CONFIRMED,
-    notes: "Spring/Summer 2024 first order",
+    sku: "BUCKET-CLASS-001",
+    season: "SS24",
+    phase: Phase.PRODUCTION_SAMPLE,
+    notes: "New design",
   },
   {
-    orderNumber: "MO-2024-002",
-    supplier: "Campolmi Florence",
-    totalPrice: 1800.0,
-    currency: "EUR",
-    orderDate: new Date("2024-01-20"),
-    expectedDelivery: new Date("2024-02-20"),
-    status: OrderStatus.PENDING,
-    notes: "Additional materials for SS24",
-  },
-  {
-    orderNumber: "MO-2024-003",
-    supplier: "Campolmi Florence",
-    totalPrice: 3200.0,
-    currency: "EUR",
-    orderDate: new Date("2024-02-01"),
-    expectedDelivery: new Date("2024-03-01"),
-    status: OrderStatus.PENDING,
-    notes: "Pre-production materials order",
+    piece: "Wide Brim Sun Hat",
+    name: "Stripes",
+    sku: "WBRIM-STRIP-001",
+    season: "SS24",
+    phase: Phase.FIT_SAMPLE,
+    notes: "In development",
   },
 ];
 
@@ -91,154 +123,173 @@ const contacts = [
     type: ContactType.MANUFACTURER,
     notes: "Primary manufacturing contact",
   },
-  {
-    name: "David Lee",
-    email: "david.lee@customer.com",
-    phone: "+1 (555) 345-6789",
-    company: "Fashion Retail Group",
-    role: "Buyer",
-    type: ContactType.CUSTOMER,
-    notes: "Key wholesale customer",
-  },
 ];
 
 async function seed() {
   try {
-    // Clear existing data
-    await prisma.materialOrderItem.deleteMany();
-    await prisma.materialOrder.deleteMany();
-    await prisma.productMaterial.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.material.deleteMany();
-    await prisma.contact.deleteMany();
+    // Clear all existing data
+    await prisma.$transaction([
+      prisma.materialMovement.deleteMany(),
+      prisma.materialInventory.deleteMany(),
+      prisma.materialOrderItem.deleteMany(),
+      prisma.materialOrder.deleteMany(),
+      prisma.productMaterial.deleteMany(),
+      prisma.product.deleteMany(),
+      prisma.material.deleteMany(),
+      prisma.contact.deleteMany(),
+      prisma.user.deleteMany(),
+    ]);
 
     console.log("Cleared existing data");
 
-    // Add materials
+    // Create users
+    const createdUsers = await Promise.all(
+      users.map((user) =>
+        prisma.user.create({
+          data: user,
+        })
+      )
+    );
+    console.log(`Created ${createdUsers.length} users`);
+
+    // Create materials
     const createdMaterials = await Promise.all(
-      materials.map((material) =>
-        prisma.material.create({
+      materials.map(async (material) => {
+        const createdMaterial = await prisma.material.create({
+          data: material,
+        });
+
+        // Create inventory entry for each material
+        await prisma.materialInventory.create({
           data: {
-            type: "Cotton",
-            color: material.color,
-            colorCode: material.colorCode,
-            brand: "Campolmi",
-            quantity: 0.0,
-            unit: MeasurementUnit.KILOGRAM,
-            costPerUnit: 0.0,
-            currency: "EUR",
-            location: "Warehouse",
-            notes: "30/2x4x4",
-            photos: [],
+            materialId: createdMaterial.id,
+            quantity: Math.floor(Math.random() * 100),
+            unit: material.defaultUnit,
+            location: "Main Warehouse",
+            notes: "Initial stock",
           },
-        })
-      )
+        });
+
+        // Create some random movements for each material
+        const movementTypes = [
+          MovementType.RECEIVED,
+          MovementType.CONSUMED,
+          MovementType.ADJUSTED,
+        ];
+        for (let i = 0; i < 3; i++) {
+          await prisma.materialMovement.create({
+            data: {
+              materialId: createdMaterial.id,
+              quantity: Math.floor(Math.random() * 50),
+              unit: material.defaultUnit,
+              type: movementTypes[i],
+              reference: `REF-${Date.now()}-${i}`,
+              notes: `Sample ${movementTypes[i]} movement`,
+            },
+          });
+        }
+
+        return createdMaterial;
+      })
+    );
+    console.log(
+      `Created ${createdMaterials.length} materials with inventory and movements`
     );
 
-    console.log(`Added ${createdMaterials.length} materials`);
-
-    // Add products
+    // Create products
     const createdProducts = await Promise.all(
-      products.map((product) =>
-        prisma.product.create({
+      products.map(async (product) => {
+        const createdProduct = await prisma.product.create({
+          data: product,
+        });
+
+        // Create product-material relationships
+        await prisma.productMaterial.create({
           data: {
-            sku: product.sku,
-            piece: product.piece,
-            name: product.name,
-            season: "SS24",
-            phase: "SWATCH",
-            notes: `Initial creation of ${product.piece} - ${product.name}`,
-            photos: [],
+            productId: createdProduct.id,
+            materialId:
+              createdMaterials[
+                Math.floor(Math.random() * createdMaterials.length)
+              ].id,
+            quantity: Math.random() * 5,
+            unit: MeasurementUnit.METER,
+            notes: "Primary material",
           },
-        })
-      )
+        });
+
+        return createdProduct;
+      })
+    );
+    console.log(
+      `Created ${createdProducts.length} products with material relationships`
     );
 
-    console.log(`Added ${createdProducts.length} products`);
+    // Create material orders
+    const orders = [];
+    for (let i = 1; i <= 3; i++) {
+      const order = await prisma.materialOrder.create({
+        data: {
+          orderNumber: `MO-2024-00${i}`,
+          supplier: "Campolmi Florence",
+          totalPrice: Math.floor(Math.random() * 5000) + 1000,
+          currency: "EUR",
+          orderDate: new Date(2024, 0, i * 5),
+          expectedDelivery: new Date(2024, 1, i * 5),
+          actualDelivery: i === 1 ? new Date(2024, 1, i * 5) : null,
+          status:
+            i === 1
+              ? OrderStatus.DELIVERED
+              : i === 2
+              ? OrderStatus.CONFIRMED
+              : OrderStatus.PENDING,
+          notes: `Order ${i} notes`,
+        },
+      });
 
-    // Add material orders
-    const createdOrders = await Promise.all(
-      materialOrders.map((order) =>
-        prisma.materialOrder.create({
-          data: {
-            orderNumber: order.orderNumber,
-            supplier: order.supplier,
-            totalPrice: order.totalPrice,
-            currency: order.currency,
-            orderDate: order.orderDate,
-            expectedDelivery: order.expectedDelivery,
-            status: order.status,
-            notes: order.notes,
-          },
-        })
-      )
-    );
-
-    console.log(`Added ${createdOrders.length} material orders`);
-
-    // Add contacts
-    const createdContacts = await Promise.all(
-      contacts.map((contact) =>
-        prisma.contact.create({
-          data: {
-            name: contact.name,
-            email: contact.email,
-            phone: contact.phone,
-            company: contact.company,
-            role: contact.role,
-            type: contact.type,
-            notes: contact.notes,
-          },
-        })
-      )
-    );
-
-    console.log(`Added ${createdContacts.length} contacts`);
-
-    // Add material order items
-    // Create some sample order items for each order
-    for (const order of createdOrders) {
-      // Add 2-3 items per order with different materials
-      const numItems = Math.floor(Math.random() * 2) + 2; // 2-3 items
-      for (let i = 0; i < numItems; i++) {
+      // Create 2-3 order items for each order
+      const numItems = Math.floor(Math.random() * 2) + 2;
+      for (let j = 0; j < numItems; j++) {
         const material =
           createdMaterials[Math.floor(Math.random() * createdMaterials.length)];
-        const quantity = Math.floor(Math.random() * 50) + 10; // 10-60 units
-        const unitPrice = Math.random() * 20 + 10; // 10-30 per unit
+        const quantity = Math.floor(Math.random() * 50) + 10;
 
         await prisma.materialOrderItem.create({
           data: {
             orderId: order.id,
             materialId: material.id,
             quantity: quantity,
-            unit: MeasurementUnit.KILOGRAM,
-            unitPrice: unitPrice,
-            totalPrice: quantity * unitPrice,
+            unit: material.defaultUnit,
+            unitPrice: material.defaultCostPerUnit,
+            totalPrice: quantity * material.defaultCostPerUnit,
             notes: `Order item for ${material.color}`,
           },
         });
       }
+
+      orders.push(order);
     }
+    console.log(`Created ${orders.length} orders with items`);
 
-    console.log("Added material order items");
-
-    // Create some product-material relationships
-    await prisma.productMaterial.create({
-      data: {
-        productId: createdProducts[0].id,
-        materialId: createdMaterials[0].id,
-        quantity: 1.0,
-        unit: MeasurementUnit.KILOGRAM,
-        notes: "Main material",
-      },
-    });
+    // Create contacts
+    const createdContacts = await Promise.all(
+      contacts.map((contact) =>
+        prisma.contact.create({
+          data: contact,
+        })
+      )
+    );
+    console.log(`Created ${createdContacts.length} contacts`);
 
     console.log("Seeding completed successfully");
   } catch (error) {
     console.error("Error seeding data:", error);
+    throw error;
   } finally {
     await prisma.$disconnect();
   }
 }
 
-seed();
+seed().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -16,37 +16,49 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-enum Role {
-  ADMIN
-  USER
-  PRODUCTION_MANAGER
-  INVENTORY_MANAGER
-}
-
 model Material {
-  id                 String              @id @default(cuid())
+  id                 String          @id @default(cuid())
   type               String
   color              String
   colorCode          String
   brand              String
-  quantity           Float
-  unit               MeasurementUnit
-  costPerUnit        Float
+  defaultUnit        MeasurementUnit
+  defaultCostPerUnit Float
   currency           String
-  location           String
   notes              String?
-  photos             String[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  products           ProductMaterial[] // Changed from styleItems
-  materialOrderItems MaterialOrderItem[] // Added opposite relation field
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  // Relations
+  inventory  MaterialInventory[]
+  movements  MaterialMovement[]
+  orderItems MaterialOrderItem[]
+  products   ProductMaterial[]
 }
 
-enum MeasurementUnit {
-  GRAM
-  KILOGRAM
-  METER
-  YARD
+model MaterialInventory {
+  id         String          @id @default(cuid())
+  materialId String
+  material   Material        @relation(fields: [materialId], references: [id])
+  quantity   Float
+  unit       MeasurementUnit
+  location   String
+  notes      String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model MaterialMovement {
+  id         String          @id @default(cuid())
+  materialId String
+  material   Material        @relation(fields: [materialId], references: [id])
+  quantity   Float
+  unit       MeasurementUnit
+  type       MovementType
+  reference  String?
+  notes      String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 }
 
 model Product {
@@ -100,10 +112,10 @@ model MaterialOrder {
 
 model MaterialOrderItem {
   id         String          @id @default(cuid())
-  order      MaterialOrder   @relation(fields: [orderId], references: [id])
   orderId    String
-  material   Material        @relation(fields: [materialId], references: [id])
+  order      MaterialOrder   @relation(fields: [orderId], references: [id])
   materialId String
+  material   Material        @relation(fields: [materialId], references: [id])
   quantity   Float
   unit       MeasurementUnit
   unitPrice  Float
@@ -111,14 +123,6 @@ model MaterialOrderItem {
   notes      String?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  SHIPPED
-  DELIVERED
-  CANCELLED
 }
 
 model Contact {
@@ -132,6 +136,36 @@ model Contact {
   notes     String?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+}
+
+enum Role {
+  ADMIN
+  USER
+  PRODUCTION_MANAGER
+  INVENTORY_MANAGER
+}
+
+enum MeasurementUnit {
+  GRAM
+  KILOGRAM
+  METER
+  YARD
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum MovementType {
+  RECEIVED
+  CONSUMED
+  ADJUSTED
+  RETURNED
+  SCRAPPED
 }
 
 enum ContactType {

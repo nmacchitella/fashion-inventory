@@ -9,12 +9,12 @@ const mainNavItems = [
     href: "/dashboard",
   },
   {
-    title: "Inventory",
-    href: "/inventory",
+    title: "Catalog",
+    href: "/catalog",
   },
   {
-    title: "Products",
-    href: "/products",
+    title: "Inventory",
+    href: "/inventory",
   },
   {
     title: "Operations",

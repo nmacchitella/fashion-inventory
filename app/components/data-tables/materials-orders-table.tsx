@@ -118,26 +118,6 @@ export function MaterialOrdersTable({
     }
   };
 
-  const handleDeleteSuccess = async (orderId: string) => {
-    try {
-      const response = await fetch(`/api/material-orders/${orderId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete order");
-      }
-
-      onDelete(orderId);
-      setIsEditDialogOpen(false);
-      setSelectedOrder(null);
-      router.refresh();
-    } catch (error) {
-      console.error("Error deleting order:", error);
-      throw error;
-    }
-  };
-
   return (
     <>
       <div className="rounded-md border">
@@ -198,7 +178,7 @@ export function MaterialOrdersTable({
           <MaterialOrderEditForm
             order={selectedOrder}
             onSaveSuccess={handleSaveSuccess}
-            onDeleteSuccess={handleDeleteSuccess}
+            onDeleteSuccess={onDelete}
             onCancel={() => {
               setIsEditDialogOpen(false);
               setSelectedOrder(null);

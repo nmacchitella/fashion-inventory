@@ -79,33 +79,48 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: { orderId: string } }
+  context: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    // First, delete all associated order items
-    const deletedItems = await prisma.materialOrderItem.deleteMany({
-      where: {
-        orderId: context.params.orderId,
-      },
-    });
-    console.log("Deleted order items:", deletedItems);
+    // Check if order exists and get its status
+    const { orderId } = await context.params;
 
-    // Then delete the order itself
-    const deletedOrder = await prisma.materialOrder.delete({
-      where: {
-        id: context.params.orderId,
-      },
+    const order = await prisma.materialOrder.findUnique({
+      where: { id: orderId },
+      select: { status: true },
     });
-    console.log("Deleted order:", deletedOrder);
+
+    if (!order) {
+      return NextResponse.json({ message: "Order not found" }, { status: 404 });
+    }
+
+    // // Don't allow deletion of shipped/delivered orders
+    // if (order.status === "SHIPPED" || order.status === "DELIVERED") {
+    //   return NextResponse.json(
+    //     { message: `Cannot delete ${order.status.toLowerCase()} orders` },
+    //     { status: 409 }
+    //   );
+    // }
+
+    // Delete order and its items in a transaction
+    await prisma.$transaction([
+      prisma.materialOrderItem.deleteMany({
+        where: { orderId: orderId },
+      }),
+      prisma.materialOrder.delete({
+        where: { id: orderId },
+      }),
+    ]);
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("Detailed error in DELETE API:", error);
+    console.error("Delete order error:", {
+      orderId: context.params.orderId,
+      error: error instanceof Error ? error.message : error,
+    });
+
     return NextResponse.json(
-      {
-        message: "Failed to delete order",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      { message: "Failed to delete order" },
       { status: 500 }
     );
   }

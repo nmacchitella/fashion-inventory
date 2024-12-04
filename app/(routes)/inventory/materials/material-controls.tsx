@@ -6,13 +6,13 @@ import { AddMaterialDialog } from "@/components/forms/add-material-dialog";
 import { Material } from "@/types/material";
 import { useState } from "react";
 
-interface InventoryControlsProps {
+interface InventoryMaterialControlsProps {
   initialMaterials: Material[];
 }
 
-export function InventoryControls({
+export function InventoryMaterialControls({
   initialMaterials,
-}: InventoryControlsProps) {
+}: InventoryMaterialControlsProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [materials, setMaterials] = useState(initialMaterials);
 
@@ -48,7 +48,7 @@ export function InventoryControls({
   return (
     <>
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Inventory</h1>
+        <h1 className="text-2xl font-bold">Material Inventory</h1>
         <button
           onClick={() => setIsAddDialogOpen(true)}
           className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
