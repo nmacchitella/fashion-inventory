@@ -4,26 +4,16 @@ import Link from "next/link";
 export default function OperationPage() {
   const operations = [
     {
-      title: "Materials",
-      description: "Track our material orders and shipments.",
-      href: "/operations/materials",
+      title: "Prepare a Material Order",
+      description: "Track and manage material orders and their status",
+      href: "/tools/material-order",
       icon: "📦", // We can replace this with a proper icon
       stats: {
         active: 5, // These could be real numbers from your DB
         pending: 2,
       },
     },
-    // should probably adjust to be "sales" & "development"
-    {
-      title: "Products",
-      description: "Track product orders and shipments.",
-      href: "/operations/products",
-      icon: "📦", // We can replace this with a proper icon
-      stats: {
-        active: 5, // These could be real numbers from your DB
-        pending: 2,
-      },
-    },
+    
   ];
 
   return (

@@ -8,41 +8,34 @@ import { useState } from "react";
 // Define the columns for the material table
 const materialColumns: DataTableColumn<Material>[] = [
   { header: "Type", accessorKey: "type" },
-  { header: "Brand", accessorKey: "brand" },
   {
     header: "Color",
     accessorKey: "color",
     cell: (material) => (
       <div className="flex items-center gap-2">
-        {material.colorCode} - {material.color}
+        <div
+          className="w-4 h-4 rounded-full border"
+          style={{ backgroundColor: material.colorCode }}
+        />
+        {material.color}
       </div>
     ),
   },
-  // {
-  //   header: "Quantity",
-  //   accessorKey: "defaultUnit",
-  //   cell: (material) => {
-  //     const inventory = material.inventory?.[0];
-  //     return inventory
-  //       ? `${inventory.quantity} ${inventory.unit}`
-  //       : "No inventory";
-  //   },
-  // },
-
+  {
+    header: "Quantity",
+    accessorKey: "defaultUnit",
+    cell: (material) => {
+      const inventory = material.inventory?.[0];
+      return inventory
+        ? `${inventory.quantity} ${inventory.unit}`
+        : "No inventory";
+    },
+  },
+  { header: "Brand", accessorKey: "brand" },
   {
     header: "Cost",
     accessorKey: "defaultCostPerUnit",
-    cell: (material) =>
-      `${material.defaultCostPerUnit} ${material.currency} / ${material.defaultUnit}`,
-  },
-  {
-    header: "Properties",
-    accessorKey: "properties",
-    cell: (material) => {
-      return Object.keys(material.properties)
-        .map((key) => `${key}: ${material.properties[key]}`)
-        .join(", ");
-    },
+    cell: (material) => `${material.defaultCostPerUnit} ${material.currency}`,
   },
 ];
 
@@ -117,7 +110,7 @@ export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to delete material");
+        throw new Error(errorData.message || "Failed to delete material");
       }
       // Remove from state
       setMaterials((prev) => prev.filter((m) => m.id !== materialId));
@@ -138,7 +131,7 @@ export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
   return (
     <>
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Materials</h1>
+        <h1 className="text-2xl font-bold">Material Inventory</h1>
         <button
           onClick={handleCreate}
           className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
@@ -150,8 +143,8 @@ export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
       <DataTable
         data={materials}
         columns={materialColumns}
-        // onDelete={handleDelete} // Called when user clicks "Delete" in a row
-        // onUpdate={handleUpdate} // Called when user clicks "Edit" in a row
+        onDelete={handleDelete} // Called when user clicks "Delete" in a row
+        onUpdate={handleUpdate} // Called when user clicks "Edit" in a row
         viewPath="/inventory/materials"
       />
 

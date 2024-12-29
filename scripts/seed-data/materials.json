@@ -1,0 +1,242 @@
+[
+  {
+    "type": "Cotton",
+    "color": "Linen White",
+    "colorCode": 2071,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Navy Blue",
+    "colorCode": 2108,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Orange",
+    "colorCode": 2088,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Pink",
+    "colorCode": 2102,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Yellow",
+    "colorCode": 2091,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Almond",
+    "colorCode": 2072,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Black",
+    "colorCode": 2094,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Cerulean Blue",
+    "colorCode": 2098,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Dark Green",
+    "colorCode": 2095,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Light Green",
+    "colorCode": 2083,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x4x4"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Linen White",
+    "colorCode": 2071,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Navy Blue",
+    "colorCode": 2108,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Orange",
+    "colorCode": 2088,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Pink",
+    "colorCode": 2102,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Yellow",
+    "colorCode": 2091,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Almond",
+    "colorCode": 2072,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Black",
+    "colorCode": 2094,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Cerulean Blue",
+    "colorCode": 2098,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Dark Green",
+    "colorCode": 2095,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  },
+  {
+    "type": "Cotton",
+    "color": "Light Green",
+    "colorCode": 2083,
+    "brand": "Campolmi",
+    "defaultUnit": "KILOGRAM",
+    "defaultCostPerUnit": 32,
+    "currency": "EUR",
+    "properties": {
+      "thread": "30/2x5x2"
+    }
+  }
+]

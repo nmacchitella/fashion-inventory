@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User management for application access control
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -16,115 +17,122 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+// Common inventory tracking for both materials and products
+// This unified model eliminates duplication between former MaterialInventory and ProductInventory
+// The type field (MATERIAL/PRODUCT) determines which foreign key (materialId/productId) is used
+model Inventory {
+  id        String          @id @default(cuid())
+  type      InventoryType // Discriminator field to distinguish between material and product inventory
+  quantity  Float
+  unit      MeasurementUnit
+  location  String
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Semi-polymorphic relationship - only one of these will be set based on type
+  materialId String?
+  material   Material? @relation(fields: [materialId], references: [id])
+  productId  String?
+  product    Product?  @relation(fields: [productId], references: [id])
+
+  // Each inventory record can have multiple transaction items (movements)
+  movements TransactionItem[]
+}
+
+// Common transaction model for tracking both material and product movements
+// Consolidates shared fields between former MaterialTransaction and ProductTransaction
+model Transaction {
+  id               String            @id @default(cuid())
+  type             InventoryType // Matches the inventory type this transaction relates to
+  transactionType  TransactionType // Tracks if items are coming in or going out
+  referenceNumber  String? // External reference (PO number, invoice number, etc.)
+  supplier         String? // Source for INCOMING transactions
+  recipient        String? // Destination for OUTGOING transactions
+  items            TransactionItem[]
+  totalPrice       Float?
+  currency         String?
+  orderDate        DateTime
+  expectedDelivery DateTime?
+  actualDelivery   DateTime?
+  status           TransactionStatus
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+// Links transactions to specific inventory items
+// Records the quantity and pricing details of each item in a transaction
+model TransactionItem {
+  id            String          @id @default(cuid())
+  transactionId String
+  transaction   Transaction     @relation(fields: [transactionId], references: [id])
+  inventoryId   String
+  inventory     Inventory       @relation(fields: [inventoryId], references: [id])
+  quantity      Float
+  unit          MeasurementUnit
+  unitPrice     Float?
+  totalPrice    Float?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+// Represents raw materials used in production
+// Examples: fabrics, buttons, zippers, thread
 model Material {
-  id                 String          @id @default(cuid())
-  type               String
+  id                 String           @id @default(cuid())
+  type               String // Category of material (e.g., "fabric", "button")
   color              String
-  colorCode          String
+  colorCode          String // Reference color code for consistency
   brand              String
-  defaultUnit        MeasurementUnit
-  defaultCostPerUnit Float
-  currency           String
+  defaultUnit        MeasurementUnit? // Standard unit for measuring this material
+  defaultCostPerUnit Float? // Standard cost for purchasing calculations
+  currency           String?
+  properties         Json?
   notes              String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   // Relations
-  inventory  MaterialInventory[]
-  movements  MaterialMovement[]
-  orderItems MaterialOrderItem[]
-  products   ProductMaterial[]
+  inventory Inventory[] // Tracks stock levels across locations
+  products  ProductMaterial[] // Links to products where this material is used
 }
 
-model MaterialInventory {
-  id         String          @id @default(cuid())
-  materialId String
-  material   Material        @relation(fields: [materialId], references: [id])
-  quantity   Float
-  unit       MeasurementUnit
-  location   String
-  notes      String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-}
-
-model MaterialMovement {
-  id         String          @id @default(cuid())
-  materialId String
-  material   Material        @relation(fields: [materialId], references: [id])
-  quantity   Float
-  unit       MeasurementUnit
-  type       MovementType
-  reference  String?
-  notes      String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-}
-
+// Represents finished or in-progress products
+// Examples: shirts, dresses, accessories
 model Product {
-  id        String            @id @default(cuid())
-  sku       String            @unique
-  piece     String
+  id        String   @id @default(cuid())
+  sku       String   @unique // Unique product identifier
+  piece     String // Type of garment
   name      String
-  season    String
-  phase     Phase
-  materials ProductMaterial[]
-  photos    String[]
+  season    String // Collection/season identifier
+  phase     Phase // Current development/production stage
+  photos    String[] // Array of photo URLs
   notes     String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  materials ProductMaterial[] // Bill of materials - what goes into making this product
+  inventory Inventory[] // Tracks stock levels across locations
 }
 
+// Associates materials with products
+// Acts as a bill of materials (BOM) for each product
 model ProductMaterial {
   id         String          @id @default(cuid())
   product    Product         @relation(fields: [productId], references: [id])
   productId  String
   material   Material        @relation(fields: [materialId], references: [id])
   materialId String
-  quantity   Float
+  quantity   Float // How much of the material is needed for one product
   unit       MeasurementUnit
   notes      String?
 }
 
-enum Phase {
-  SWATCH
-  INITIAL_SAMPLE
-  FIT_SAMPLE
-  PRODUCTION_SAMPLE
-  PRODUCTION
-}
-
-model MaterialOrder {
-  id               String              @id @default(cuid())
-  orderNumber      String              @unique
-  supplier         String
-  orderItems       MaterialOrderItem[]
-  totalPrice       Float
-  currency         String
-  orderDate        DateTime
-  expectedDelivery DateTime
-  actualDelivery   DateTime?
-  status           OrderStatus
-  notes            String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-}
-
-model MaterialOrderItem {
-  id         String          @id @default(cuid())
-  orderId    String
-  order      MaterialOrder   @relation(fields: [orderId], references: [id])
-  materialId String
-  material   Material        @relation(fields: [materialId], references: [id])
-  quantity   Float
-  unit       MeasurementUnit
-  unitPrice  Float
-  totalPrice Float
-  notes      String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-}
-
+// Stores information about external parties
+// Used for suppliers, manufacturers, customers
 model Contact {
   id        String      @id @default(cuid())
   name      String
@@ -132,10 +140,17 @@ model Contact {
   phone     String?
   company   String?
   role      String?
-  type      ContactType
+  type      ContactType // Categorizes the contact's relationship to the business
   notes     String?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+}
+
+// Enums for standardizing choices across the application
+
+enum InventoryType {
+  MATERIAL // Raw materials inventory
+  PRODUCT // Finished goods inventory
 }
 
 enum Role {
@@ -150,22 +165,28 @@ enum MeasurementUnit {
   KILOGRAM
   METER
   YARD
+  UNIT
 }
 
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  SHIPPED
-  DELIVERED
-  CANCELLED
+enum TransactionType {
+  INCOMING // Receiving inventory
+  OUTGOING // Shipping/using inventory
+}
+
+enum TransactionStatus {
+  PENDING // Transaction created but not confirmed
+  CONFIRMED // Transaction verified and approved
+  SHIPPED // Items in transit
+  DELIVERED // Items received at destination
+  CANCELLED // Transaction voided
 }
 
 enum MovementType {
-  RECEIVED
-  CONSUMED
-  ADJUSTED
-  RETURNED
-  SCRAPPED
+  RECEIVED // New inventory received
+  CONSUMED // Used in production
+  ADJUSTED // Inventory count corrections
+  RETURNED // Sent back to supplier
+  SCRAPPED // Damaged or unusable
 }
 
 enum ContactType {
@@ -173,4 +194,12 @@ enum ContactType {
   MANUFACTURER
   CUSTOMER
   OTHER
+}
+
+enum Phase {
+  SWATCH // Initial material selection
+  INITIAL_SAMPLE // First prototype
+  FIT_SAMPLE // Size/fit testing
+  PRODUCTION_SAMPLE // Final pre-production version
+  PRODUCTION // Active manufacturing
 }

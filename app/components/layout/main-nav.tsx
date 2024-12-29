@@ -8,10 +8,10 @@ const mainNavItems = [
     title: "Dashboard",
     href: "/dashboard",
   },
-  {
-    title: "Catalog",
-    href: "/catalog",
-  },
+  // { da riaggiungere quando abbiamo le diverse stagioni
+  //   title: "Catalog",
+  //   href: "/catalog",
+  // },
   {
     title: "Inventory",
     href: "/inventory",
@@ -23,6 +23,10 @@ const mainNavItems = [
   {
     title: "Contacts",
     href: "/contacts",
+  },
+  {
+    title: "Tools",
+    href: "/tools",
   },
 ];
 

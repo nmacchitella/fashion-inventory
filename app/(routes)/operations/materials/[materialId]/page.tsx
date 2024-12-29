@@ -1,15 +1,15 @@
 "use client";
 
-import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { UpsertDialog } from "@/components/forms/upsert-dialog"; // Our generic create/edit dialog
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
-import { Inventory, Material } from "@/types/types";
-import { Plus } from "lucide-react";
+import { Material } from "@/types/types";
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+// Example form fields for a Material
+// Adapt these to match your Material schema
 const materialFields = [
   { key: "type", label: "Type", type: "text", required: true },
   { key: "color", label: "Color", type: "text" },
@@ -20,7 +20,7 @@ const materialFields = [
   { key: "costPerUnit", label: "Cost Per Unit", type: "number" },
   { key: "currency", label: "Currency", type: "text" },
   { key: "location", label: "Location", type: "text" },
-  { key: "Properties", label: "Properties", type: "textarea" },
+  { key: "notes", label: "Notes", type: "textarea" },
 ];
 
 // Fetch the material from the API:
@@ -58,50 +58,36 @@ export default function MaterialPage({
   }
 
   // Prepare detail items for <DetailsView>
-  console.log(material);
   const detailItems = [
+    { label: "Type", value: material.type },
     {
-      label: "Brand",
-      value: material.brand, // Make sure this is a string
-      key: "brand",
-      editable: true,
+      label: "Color",
+      value: (
+        <div className="flex items-center gap-2">
+          <div
+            className="w-4 h-4 rounded-full border"
+            style={{ backgroundColor: material.colorCode }}
+          />
+          {material.color}
+        </div>
+      ),
     },
-    {
-      label: "Type",
-      value: material.type, // Make sure this is a string
-      key: "type",
-      editable: true,
-    },
+    { label: "Color Code", value: material.colorCode },
+    { label: "Brand", value: material.brand },
+    { label: "Quantity", value: `${material.quantity} ${material.unit}` },
     {
       label: "Cost Per Unit",
-      value: material.defaultCostPerUnit, // This should be a number
-      key: "costPerUnit",
-      type: "number",
-      editable: true,
+      value: `${material.costPerUnit} ${material.currency}`,
     },
-  ];
-
-  // -- Column definitions --
-
-  const inventoryColumns: DataTableColumn<Inventory>[] = [
+    { label: "Location", value: material.location },
+    { label: "Notes", value: material.notes || "No notes" },
     {
-      header: "Quantity",
-      accessorKey: "quantity",
-      cell: (inventory) => `${inventory.quantity} ${inventory.unit}`,
-    },
-    { header: "Location", accessorKey: "location" },
-  ];
-
-  const productsColumns: DataTableColumn<Inventory>[] = [
-    {
-      header: "Model",
-      accessorKey: "name",
-      cell: (product) => `${product.product.name}`,
+      label: "Created At",
+      value: new Date(material.createdAt).toLocaleDateString(),
     },
     {
-      header: "Season",
-      accessorKey: "season",
-      cell: (product) => `${product.product.season}`,
+      label: "Updated At",
+      value: new Date(material.updatedAt).toLocaleDateString(),
     },
   ];
 
@@ -133,66 +119,22 @@ export default function MaterialPage({
       {/* Page Header */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">
-            {material.colorCode} - {material.color}
-          </h1>
+          <h1 className="text-2xl font-bold">Material Details</h1>
           <div className="flex gap-2">
-            {/* <button
+            <button
               onClick={() => setIsEditDialogOpen(true)}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
             >
               Edit
-            </button> */}
+            </button>
             <BackButton />
           </div>
         </div>
 
         <DetailsView
-          title=""
+          title={`${material.type} - ${material.color}`}
           items={detailItems}
-          apiEndpoint="/api/materials"
-          itemId={material.id}
         />
-      </div>
-
-      <div className="mt-6 flex flex-col gap-6">
-        <div className="">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-1xl font-bold">Inventory</h2>
-            <button
-              className="p-1 hover:bg-gray-100 rounded-full"
-              title="Add new inventory item"
-              // onClick={() => console.log("Add new inventory clicked")}
-              onClick={() => setIsEditDialogOpen(true)}
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-
-          <DataTable
-            data={material.inventory}
-            columns={inventoryColumns}
-            viewPath="/inventory" // Assuming the details path for inventory items
-          />
-        </div>
-        <div className="">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-1xl font-bold">Product</h2>
-            <button
-              className="p-1 hover:bg-gray-100 rounded-full"
-              title="Add new inventory item"
-              onClick={() => console.log("Add new inventory clicked")}
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-
-          <DataTable
-            data={material.products}
-            columns={productsColumns}
-            viewPath="/inventory" // Assuming the details path for inventory items
-          />
-        </div>
       </div>
 
       {/* Our UpsertDialog for editing the material */}

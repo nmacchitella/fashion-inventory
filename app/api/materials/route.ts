@@ -3,7 +3,20 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const materials = await prisma.material.findMany();
+    const materials = await prisma.material.findMany({
+      include: {
+        inventory: true,
+        products: {
+          include: {
+            product: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
     return NextResponse.json(materials);
   } catch (error) {
     console.error("Error:", error);
@@ -18,22 +31,19 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
 
-    // Validate required fields
+    // Basic validation
     const requiredFields = [
       "type",
       "color",
       "colorCode",
       "brand",
-      "quantity",
-      "unit",
-      "costPerUnit",
+      // "defaultUnit",
+      // "defaultCostPerUnit",
       "currency",
-      "location",
     ];
-
     for (const field of requiredFields) {
-      // Changed validation to check for undefined or null
-      if (json[field] === undefined || json[field] === null) {
+      if (!json[field]) {
+        console.log("missing", field);
         return NextResponse.json(
           { error: `Missing required field: ${field}` },
           { status: 400 }
@@ -41,46 +51,56 @@ export async function POST(request: Request) {
       }
     }
 
-    // Additional validation for numeric fields
-    if (
-      typeof json.quantity !== "number" &&
-      typeof parseFloat(json.quantity) !== "number"
-    ) {
-      return NextResponse.json(
-        { error: "Quantity must be a number" },
-        { status: 400 }
-      );
-    }
+    // Create material with potential relationships
+    const material = await prisma.$transaction(async (tx) => {
+      // Create the base material
+      const newMaterial = await tx.material.create({
+        data: {
+          type: json.type,
+          color: json.color,
+          colorCode: json.colorCode,
+          brand: json.brand,
+          // defaultUnit: json.defaultUnit,
+          // defaultCostPerUnit: parseFloat(json.defaultCostPerUnit),
+          // currency: json.currency,
+          notes: json.notes || null,
+        },
+      });
 
-    if (
-      typeof json.costPerUnit !== "number" &&
-      typeof parseFloat(json.costPerUnit) !== "number"
-    ) {
-      return NextResponse.json(
-        { error: "Cost per unit must be a number" },
-        { status: 400 }
-      );
-    }
+      // Create inventory if provided
+      if (json.inventory?.length) {
+        await tx.inventory.createMany({
+          data: json.inventory.map((inv: any) => ({
+            type: "MATERIAL",
+            materialId: newMaterial.id,
+            quantity: inv.quantity,
+            unit: inv.unit,
+            location: inv.location,
+            notes: inv.notes,
+          })),
+        });
+      }
 
-    const material = await prisma.material.create({
-      data: {
-        type: json.type,
-        color: json.color,
-        colorCode: json.colorCode,
-        brand: json.brand,
-        quantity: parseFloat(json.quantity),
-        unit: json.unit,
-        costPerUnit: parseFloat(json.costPerUnit),
-        currency: json.currency,
-        location: json.location,
-        notes: json.notes || null,
-        photos: json.photos || [],
+      return newMaterial;
+    });
+
+    // Fetch complete material with relations
+    const materialWithRelations = await prisma.material.findUnique({
+      where: { id: material.id },
+      include: {
+        inventory: true,
+        products: {
+          include: {
+            material: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json(material);
+    return NextResponse.json(materialWithRelations);
   } catch (error) {
     console.error("Error:", error);
+
     return NextResponse.json(
       { error: "Error creating material" },
       { status: 500 }

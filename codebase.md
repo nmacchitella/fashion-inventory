@@ -154,6 +154,297 @@ next-env.d.ts
   }
 ```
 
+# app/(routes)/contacts/[contactId]/page.tsx
+
+```tsx
+"use client";
+
+// import { ContactEditForm } from "@/components/forms/contact-edit-form";
+import { BackButton } from "@/components/ui/back-button";
+import { DetailsView } from "@/components/ui/details-view";
+import { DialogComponent } from "@/components/ui/dialog";
+import { Contact } from "@/types/types";
+import { notFound, useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
+
+async function getContact(contactId: string) {
+  try {
+    const response = await fetch(`/api/contacts/${contactId}`);
+    const data = await response.json();
+
+    if (!data || response.status === 404) {
+      notFound();
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching contact:", error);
+    throw error;
+  }
+}
+
+function getContactTypeColor(type: string) {
+  switch (type) {
+    case "SUPPLIER":
+      return "bg-blue-100 text-blue-800";
+    case "MANUFACTURER":
+      return "bg-purple-100 text-purple-800";
+    case "CUSTOMER":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+export default function ContactPage({
+  params,
+}: {
+  params: Promise<{ contactId: string }>;
+}) {
+  const router = useRouter();
+  const resolvedParams = use(params);
+  const [contact, setContact] = useState<Contact | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  useEffect(() => {
+    getContact(resolvedParams.contactId).then(setContact);
+  }, [resolvedParams.contactId]);
+
+  if (!contact) {
+    return <div>Loading...</div>;
+  }
+
+  const handleSave = async (updatedContact: Partial<Contact>) => {
+    try {
+      const response = await fetch(
+        `/api/contacts/${resolvedParams.contactId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedContact),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update contact");
+      }
+
+      const updated = await response.json();
+      setContact(updated);
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating contact:", error);
+    }
+  };
+
+  const handleDelete = async (contactId: string) => {
+    try {
+      const response = await fetch(`/api/contacts/${contactId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete contact");
+      }
+      router.push("/contacts");
+      router.refresh();
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      throw error;
+    }
+  };
+
+  const detailItems = [
+    { label: "Name", value: contact.name },
+    { label: "Email", value: contact.email },
+    { label: "Phone", value: contact.phone || "Not provided" },
+    { label: "Company", value: contact.company || "Not provided" },
+    { label: "Role", value: contact.role || "Not provided" },
+    {
+      label: "Type",
+      value: (
+        <span
+          className={`px-2 py-1 rounded-full text-sm ${getContactTypeColor(
+            contact.type
+          )}`}
+        >
+          {contact.type}
+        </span>
+      ),
+    },
+    { label: "Notes", value: contact.notes || "No notes" },
+    {
+      label: "Created At",
+      value: new Date(contact.createdAt).toLocaleDateString(),
+    },
+    {
+      label: "Updated At",
+      value: new Date(contact.updatedAt).toLocaleDateString(),
+    },
+  ];
+
+  return (
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Contact Details</h1>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsEditDialogOpen(true)}
+              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+            >
+              Edit
+            </button>
+            <BackButton />
+          </div>
+        </div>
+        <DetailsView title={contact.name} items={detailItems} />
+      </div>
+
+      <DialogComponent
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        title="Edit Contact"
+      >
+        {/* <ContactEditForm
+          contact={contact}
+          onSaveSuccess={handleSave}
+          onDeleteSuccess={handleDelete}
+          onCancel={() => setIsEditDialogOpen(false)}
+          mode="edit"
+        /> */}
+      </DialogComponent>
+    </>
+  );
+}
+
+```
+
+# app/(routes)/contacts/contact-controls.tsx
+
+```tsx
+"use client";
+
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@/components/data-tables/data-table";
+import { EditForm } from "@/components/forms/edit-form";
+import { Contact } from "@/types/types";
+import { useState } from "react";
+
+// Column definitions
+const contactColumns: DataTableColumn<Contact>[] = [
+  { header: "Name", accessorKey: "name" },
+  { header: "Email", accessorKey: "email" },
+  { header: "Phone", accessorKey: "phone" },
+  { header: "Type", accessorKey: "type" },
+  { header: "Company", accessorKey: "company" },
+];
+
+interface ContactsControlsProps {
+  initialContacts: Contact[];
+}
+
+export function ContactsControls({ initialContacts }: ContactsControlsProps) {
+  const [contacts, setContacts] = useState(initialContacts);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleDelete = async (contactId: string) => {
+    try {
+      const response = await fetch(`/api/contacts/${contactId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete contact");
+      }
+
+      setContacts((prevContacts) =>
+        prevContacts.filter((c) => c.id !== contactId)
+      );
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      throw error;
+    }
+  };
+
+  const handleUpdate = (updatedContact: Contact) => {
+    setContacts((prevContacts) =>
+      prevContacts.map((c) => (c.id === updatedContact.id ? updatedContact : c))
+    );
+    setIsEditing(false);
+  };
+
+  const handleAddSuccess = (newContact: Contact) => {
+    setContacts((prevContacts) => [newContact, ...prevContacts]);
+    setIsEditing(false);
+  };
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Contacts</h1>
+        <button
+          onClick={() => {
+            setSelectedContact(null);
+            setIsEditing(true);
+          }}
+          className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+        >
+          Add Contact
+        </button>
+      </div>
+
+      <DataTable
+        data={contacts}
+        columns={contactColumns}
+        onDelete={handleDelete}
+        onUpdate={(contact) => {
+          setSelectedContact(contact);
+          setIsEditing(true);
+        }}
+        viewPath="/contacts"
+      />
+
+      {isEditing && (
+        <EditForm
+          mode={selectedContact ? "edit" : "create"}
+          initialData={
+            selectedContact || {
+              id: "",
+              name: "",
+              email: "",
+              phone: "",
+              type: "",
+              company: "",
+            }
+          }
+          fields={[
+            { key: "name", label: "Name", type: "text", required: true },
+            { key: "email", label: "Email", type: "text", required: true },
+            { key: "phone", label: "Phone", type: "text", required: true },
+            { key: "type", label: "Type", type: "text", required: true },
+            { key: "company", label: "Company", type: "text" },
+          ]}
+          onSaveSuccess={(contact) =>
+            selectedContact ? handleUpdate(contact) : handleAddSuccess(contact)
+          }
+          onDeleteSuccess={handleDelete}
+          onCancel={() => setIsEditing(false)}
+        />
+      )}
+    </>
+  );
+}
+
+```
+
 # app/(routes)/contacts/loading.tsx
 
 ```tsx
@@ -170,99 +461,27 @@ export default function InventoryLoading() {
 # app/(routes)/contacts/page.tsx
 
 ```tsx
-import { ContactsTable } from "@/components/data-tables/contacts-table";
 import { prisma } from "@/lib/prisma";
-import { Contact, ContactType } from "@/types/contact";
-import { Prisma } from "@prisma/client";
+import { ContactsControls } from "./contact-controls";
 
-// Helper function to map Prisma ContactType to our local ContactType
-function mapContactType(type: Prisma.ContactType): ContactType {
-  switch (type) {
-    case "SUPPLIER":
-      return ContactType.SUPPLIER;
-    case "MANUFACTURER":
-      return ContactType.MANUFACTURER;
-    case "CUSTOMER":
-      return ContactType.CUSTOMER;
-    case "OTHER":
-      return ContactType.OTHER;
-    default:
-      return ContactType.OTHER;
-  }
-}
+async function getContacts() {
+  const contacts = await prisma.contact.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-async function getContacts(): Promise<Contact[]> {
-  if (!prisma) {
-    console.error("Prisma client is not initialized");
-    throw new Error("Database client not initialized");
-  }
-
-  try {
-    // First check if we can connect to the database
-    await prisma.$connect();
-
-    // Then try to get the contacts
-    const contacts = await prisma.contact.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    console.log("Fetched contacts:", contacts); // Debug log
-
-    return contacts.map((contact) => ({
-      ...contact,
-      type: mapContactType(contact.type),
-      createdAt: new Date(contact.createdAt),
-      updatedAt: new Date(contact.updatedAt),
-    }));
-  } catch (error) {
-    console.error("Error fetching contacts:", error);
-    throw new Error(
-      `Failed to fetch contacts: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
-  } finally {
-    // Always disconnect after the operation
-    await prisma.$disconnect();
-  }
+  return contacts;
 }
 
 export default async function ContactsPage() {
-  try {
-    const contacts = await getContacts();
+  const initialContacts = await getContacts();
 
-    if (!Array.isArray(contacts)) {
-      console.error("Contacts is not an array:", contacts);
-      throw new Error("Invalid contacts data format");
-    }
-
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Contacts</h1>
-          <button className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800">
-            Add Contact
-          </button>
-        </div>
-
-        <ContactsTable contacts={contacts} />
-      </div>
-    );
-  } catch (error) {
-    console.error("Error in ContactsPage:", error);
-    return (
-      <div className="p-4 rounded-md bg-red-50 text-red-800">
-        <h2 className="text-lg font-semibold mb-2">Error loading contacts</h2>
-        <p>
-          {error instanceof Error
-            ? error.message
-            : "An unexpected error occurred"}
-        </p>
-      </div>
-    );
-  }
+  return (
+    <div className="space-y-4">
+      <ContactsControls initialContacts={initialContacts} />
+    </div>
+  );
 }
 
 ```
@@ -411,91 +630,6 @@ export default async function DashboardPage() {
 
 ```
 
-# app/(routes)/inventory/inventory-controls.tsx
-
-```tsx
-// app/inventory/inventory-controls.tsx
-"use client";
-
-import { MaterialsTable } from "@/components/data-tables/materials-table";
-import { AddMaterialDialog } from "@/components/forms/add-material-dialog";
-import { Material } from "@/types/material";
-import { useState } from "react";
-
-interface InventoryControlsProps {
-  initialMaterials: Material[];
-}
-
-export function InventoryControls({
-  initialMaterials,
-}: InventoryControlsProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [materials, setMaterials] = useState(initialMaterials);
-
-  const handleAddSuccess = (newMaterial: Material) => {
-    setMaterials((prevMaterials) => [newMaterial, ...prevMaterials]);
-    setIsAddDialogOpen(false);
-  };
-
-  const handleDelete = async (materialId: string) => {
-    try {
-      const response = await fetch(`/api/materials/${materialId}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to delete material");
-      }
-
-      // Only update the UI if deletion was successful
-      setMaterials((prevMaterials) =>
-        prevMaterials.filter((m) => m.id !== materialId)
-      );
-
-      return data;
-    } catch (error) {
-      console.error("Error deleting material:", error);
-      throw error;
-    }
-  };
-
-  return (
-    <>
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Inventory</h1>
-        <button
-          onClick={() => setIsAddDialogOpen(true)}
-          className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
-        >
-          Add Material
-        </button>
-      </div>
-
-      <MaterialsTable
-        materials={materials}
-        onDelete={handleDelete}
-        onUpdate={(updatedMaterial) => {
-          setMaterials((prevMaterials) =>
-            prevMaterials.map((m) =>
-              m.id === updatedMaterial.id ? updatedMaterial : m
-            )
-          );
-        }}
-      />
-
-      <AddMaterialDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        onSuccess={handleAddSuccess}
-      />
-    </>
-  );
-}
-
-```
-
 # app/(routes)/inventory/loading.tsx
 
 ```tsx
@@ -518,7 +652,7 @@ import { MaterialEditForm } from "@/components/forms/material-edit-form";
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
-import { Material } from "@/types/material";
+import { Material } from "@/types/types";
 import { notFound, useRouter } from "next/navigation"; // Add this import
 import { use, useEffect, useState } from "react";
 
@@ -658,7 +792,7 @@ export default function MaterialPage({
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         title="Edit Material"
-      > 
+      >
         <MaterialEditForm
           material={material}
           onSaveSuccess={handleSave}
@@ -673,12 +807,132 @@ export default function MaterialPage({
 
 ```
 
-# app/(routes)/inventory/page.tsx
+# app/(routes)/inventory/materials/material-controls.tsx
+
+```tsx
+// app/inventory/material-controls.tsx
+"use client";
+
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@/components/data-tables/data-table";
+import { AddMaterialDialog } from "@/components/forms/add-material-dialog";
+import { Material } from "@/types/types";
+import { useState } from "react";
+
+// Column definitions
+const materialColumns: DataTableColumn<Material>[] = [
+  { header: "Type", accessorKey: "type" },
+  {
+    header: "Color",
+    accessorKey: "color",
+    cell: (material) => (
+      <div className="flex items-center gap-2">
+        <div
+          className="w-4 h-4 rounded-full border"
+          style={{ backgroundColor: material.colorCode }}
+        />
+        {material.color}
+      </div>
+    ),
+  },
+  {
+    header: "Quantity",
+    accessorKey: "defaultUnit",
+    cell: (material) => {
+      const inventory = material.inventory?.[0];
+      return inventory
+        ? `${inventory.quantity} ${inventory.unit}`
+        : "No inventory";
+    },
+  },
+  { header: "Brand", accessorKey: "brand" },
+  {
+    header: "Cost",
+    accessorKey: "defaultCostPerUnit",
+    cell: (material) => `${material.defaultCostPerUnit} ${material.currency}`,
+  },
+];
+
+interface MaterialControlsProps {
+  initialMaterials: Material[];
+}
+
+export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [materials, setMaterials] = useState(initialMaterials);
+
+  const handleAddSuccess = (newMaterial: Material) => {
+    setMaterials((prevMaterials) => [newMaterial, ...prevMaterials]);
+    setIsAddDialogOpen(false);
+  };
+
+  const handleDelete = async (materialId: string) => {
+    try {
+      const response = await fetch(`/api/materials/${materialId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete material");
+      }
+
+      setMaterials((prevMaterials) =>
+        prevMaterials.filter((m) => m.id !== materialId)
+      );
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      throw error;
+    }
+  };
+
+  const handleUpdate = (updatedMaterial: Material) => {
+    setMaterials((prevMaterials) =>
+      prevMaterials.map((m) =>
+        m.id === updatedMaterial.id ? updatedMaterial : m
+      )
+    );
+  };
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Material Inventory</h1>
+        <button
+          onClick={() => setIsAddDialogOpen(true)}
+          className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+        >
+          Add Material
+        </button>
+      </div>
+
+      <DataTable
+        data={materials}
+        columns={materialColumns}
+        onDelete={handleDelete}
+        onUpdate={handleUpdate}
+        viewPath="/inventory/materials"
+      />
+
+      <AddMaterialDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSuccess={handleAddSuccess}
+      />
+    </>
+  );
+}
+
+```
+
+# app/(routes)/inventory/materials/page.tsx
 
 ```tsx
 // app/inventory/page.tsx
 import { prisma } from "@/lib/prisma";
-import { InventoryControls } from "./inventory-controls";
+import { MaterialControls } from "./material-controls";
 
 async function getInventory() {
   const materials = await prisma.material.findMany({
@@ -694,8 +948,440 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-4">
-      <InventoryControls initialMaterials={initialMaterials} />
+      <MaterialControls initialMaterials={initialMaterials} />
     </div>
+  );
+}
+
+```
+
+# app/(routes)/inventory/page.tsx
+
+```tsx
+// app/inventory/page.tsx
+import Link from "next/link";
+
+export default function InventoryPage() {
+  const inventories = [
+    {
+      title: "Materials",
+      description: "Track and manage material orders and their status",
+      href: "/inventory/materials",
+      icon: "📦", // We can replace this with a proper icon
+      stats: {
+        active: 5, // These could be real numbers from your DB
+        pending: 2,
+      },
+    },
+    {
+      title: "Products",
+      description: "Track and manage material orders and their status",
+      href: "/inventory/products",
+      icon: "📦", // We can replace this with a proper icon
+      stats: {
+        active: 5, // These could be real numbers from your DB
+        pending: 2,
+      },
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Inventory</h1>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {inventories.map((inventory) => (
+          <Link
+            key={inventory.title}
+            href={inventory.href}
+            className="block p-6 bg-white rounded-lg border hover:shadow-lg transition-shadow"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="text-2xl">{inventory.icon}</div>
+              <div>
+                <h3 className="text-lg font-semibold">{inventory.title}</h3>
+                <p className="text-sm text-gray-500">{inventory.description}</p>
+              </div>
+            </div>
+
+            {inventory.stats && (
+              <div className="mt-4 flex space-x-4">
+                <div className="text-sm">
+                  <span className="font-medium text-green-600">
+                    {inventory.stats.active}
+                  </span>
+                  <span className="text-gray-500"> active</span>
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium text-yellow-600">
+                    {inventory.stats.pending}
+                  </span>
+                  <span className="text-gray-500"> pending</span>
+                </div>
+              </div>
+            )}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+```
+
+# app/(routes)/inventory/products/[productId]/page.tsx
+
+```tsx
+"use client";
+
+import { ProductEditForm } from "@/components/forms/product-edit-form";
+import { BackButton } from "@/components/ui/back-button";
+import { DetailsView } from "@/components/ui/details-view";
+import { DialogComponent } from "@/components/ui/dialog";
+import { Product } from "@/types/product";
+import { notFound, useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
+
+async function getProduct(productId: string) {
+  try {
+    const response = await fetch(`/api/products/${productId}`);
+    const data = await response.json();
+
+    if (!data || response.status === 404) {
+      notFound();
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching product:", error);
+    throw error;
+  }
+}
+
+export default function ProductPage({
+  params,
+}: {
+  params: Promise<{ productId: string }>;
+}) {
+  const router = useRouter();
+  const resolvedParams = use(params);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  useEffect(() => {
+    getProduct(resolvedParams.productId).then(setProduct);
+  }, [resolvedParams.productId]);
+
+  if (!product) {
+    return <div>Loading...</div>;
+  }
+
+  const handleSave = async (updatedProduct: Partial<Product>) => {
+    try {
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedProduct),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update product");
+      }
+
+      const updated = await response.json();
+      setProduct(updated);
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating product:", error);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete product");
+      }
+
+      router.push("/products");
+      router.refresh();
+    } catch (error) {
+      console.error("Error deleting product:", error);
+    }
+  };
+
+  const detailItems = [
+    { label: "SKU", value: product.sku },
+    { label: "Piece", value: product.piece },
+    { label: "Name", value: product.name },
+    { label: "Season", value: product.season },
+    {
+      label: "Phase",
+      value: (
+        <span
+          className={`px-2 py-1 rounded-full text-sm ${getPhaseColor(
+            product.phase
+          )}`}
+        >
+          {product.phase}
+        </span>
+      ),
+    },
+    {
+      label: "Materials",
+      value: (
+        <div className="space-y-2">
+          {product.materials?.map((pm) => (
+            <div key={pm.id} className="flex items-center gap-2">
+              <div
+                className="w-4 h-4 rounded-full border"
+                style={{ backgroundColor: pm.material.colorCode }}
+              />
+              <span>
+                {pm.material.type} - {pm.material.color}
+              </span>
+              <span className="text-gray-500">
+                ({pm.quantity} {pm.unit})
+              </span>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    { label: "Notes", value: product.notes || "No notes" },
+    {
+      label: "Created At",
+      value: new Date(product.createdAt).toLocaleDateString(),
+    },
+    {
+      label: "Updated At",
+      value: new Date(product.updatedAt).toLocaleDateString(),
+    },
+  ];
+
+  return (
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Product Details</h1>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsEditDialogOpen(true)}
+              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+            >
+              Edit
+            </button>
+            <BackButton />
+          </div>
+        </div>
+        <DetailsView
+          title={`${product.piece} - ${product.name}`}
+          items={detailItems}
+        />
+      </div>
+
+      {isEditDialogOpen && (
+        <DialogComponent
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          title="Edit Product"
+        >
+          <ProductEditForm
+            product={product}
+            onSaveSuccess={handleSave}
+            onDeleteSuccess={handleDelete}
+            onCancel={() => setIsEditDialogOpen(false)}
+            mode="edit"
+          />
+        </DialogComponent>
+      )}
+    </>
+  );
+}
+
+function getPhaseColor(phase: string) {
+  switch (phase) {
+    case "SWATCH":
+      return "bg-blue-100 text-blue-800";
+    case "INITIAL_SAMPLE":
+      return "bg-yellow-100 text-yellow-800";
+    case "FIT_SAMPLE":
+      return "bg-purple-100 text-purple-800";
+    case "PRODUCTION_SAMPLE":
+      return "bg-orange-100 text-orange-800";
+    case "PRODUCTION":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+```
+
+# app/(routes)/inventory/products/loading.tsx
+
+```tsx
+export default function ProductsLoading() {
+  return (
+    <div className="w-full h-24 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+    </div>
+  );
+}
+
+```
+
+# app/(routes)/inventory/products/page.tsx
+
+```tsx
+import { prisma } from "@/lib/prisma";
+import { ProductsControls } from "./products-controls";
+
+async function getProducts() {
+  const products = await prisma.product.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return products;
+}
+
+export default async function ProductsPage() {
+  const initialProducts = await getProducts();
+
+  return (
+    <div className="space-y-4">
+      <ProductsControls initialProducts={initialProducts} />
+    </div>
+  );
+}
+
+```
+
+# app/(routes)/inventory/products/products-controls.tsx
+
+```tsx
+"use client";
+
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@/components/data-tables/data-table";
+import { AddProductDialog } from "@/components/forms/add-product-dialog";
+import { Product } from "@/types/types";
+import { useState } from "react";
+
+// Column definitions
+const productColumns: DataTableColumn<Product>[] = [
+  { header: "SKU", accessorKey: "sku" },
+  { header: "Piece", accessorKey: "piece" },
+  { header: "Name", accessorKey: "name" },
+  { header: "Season", accessorKey: "season" },
+  {
+    header: "Phase",
+    accessorKey: "phase",
+    cell: (product) => (
+      <span
+        className={`px-2 py-1 rounded-full text-sm ${getPhaseColor(
+          product.phase
+        )}`}
+      >
+        {product.phase}
+      </span>
+    ),
+  },
+];
+
+function getPhaseColor(phase: string) {
+  switch (phase) {
+    case "SWATCH":
+      return "bg-blue-100 text-blue-800";
+    case "INITIAL_SAMPLE":
+      return "bg-yellow-100 text-yellow-800";
+    case "FIT_SAMPLE":
+      return "bg-purple-100 text-purple-800";
+    case "PRODUCTION_SAMPLE":
+      return "bg-orange-100 text-orange-800";
+    case "PRODUCTION":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+interface ProductsControlsProps {
+  initialProducts: Product[];
+}
+
+export function ProductsControls({ initialProducts }: ProductsControlsProps) {
+  const [products, setProducts] = useState(initialProducts);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+  const handleDelete = async (productId: string) => {
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete product");
+      }
+
+      setProducts((prevProducts) =>
+        prevProducts.filter((p) => p.id !== productId)
+      );
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      throw error;
+    }
+  };
+
+  const handleUpdate = (updatedProduct: Product) => {
+    setProducts((prevProducts) =>
+      prevProducts.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+    );
+  };
+
+  const handleAddSuccess = (newProduct: Product) => {
+    setProducts((prevProducts) => [newProduct, ...prevProducts]);
+    setIsAddDialogOpen(false);
+  };
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Products</h1>
+        <button
+          onClick={() => setIsAddDialogOpen(true)}
+          className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+        >
+          Add Product
+        </button>
+      </div>
+
+      <DataTable
+        data={products}
+        columns={productColumns}
+        onDelete={handleDelete}
+        onUpdate={handleUpdate}
+        viewPath="/inventory/products"
+      />
+
+      <AddProductDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSuccess={handleAddSuccess}
+      />
+    </>
   );
 }
 
@@ -1129,316 +1815,242 @@ export default function OperationsPage() {
 
 ```
 
-# app/(routes)/products/[productId]/page.tsx
+# app/api/contacts/[contactId]/route.ts
 
-```tsx
-"use client";
-
-import { ProductEditForm } from "@/components/forms/product-edit-form";
-import { BackButton } from "@/components/ui/back-button";
-import { DetailsView } from "@/components/ui/details-view";
-import { DialogComponent } from "@/components/ui/dialog";
-import { Product } from "@/types/product";
-import { notFound, useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
-
-async function getProduct(productId: string) {
-  try {
-    const response = await fetch(`/api/products/${productId}`);
-    const data = await response.json();
-
-    if (!data || response.status === 404) {
-      notFound();
-    }
-
-    return data;
-  } catch (error) {
-    console.error("Error fetching product:", error);
-    throw error;
-  }
-}
-
-export default function ProductPage({
-  params,
-}: {
-  params: Promise<{ productId: string }>;
-}) {
-  const router = useRouter();
-  const resolvedParams = use(params);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  useEffect(() => {
-    getProduct(resolvedParams.productId).then(setProduct);
-  }, [resolvedParams.productId]);
-
-  if (!product) {
-    return <div>Loading...</div>;
-  }
-
-  const handleSave = async (updatedProduct: Partial<Product>) => {
-    try {
-      const response = await fetch(`/api/products/${product.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedProduct),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update product");
-      }
-
-      const updated = await response.json();
-      setProduct(updated);
-      setIsEditDialogOpen(false);
-    } catch (error) {
-      console.error("Error updating product:", error);
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      const response = await fetch(`/api/products/${product.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete product");
-      }
-
-      router.push("/products");
-      router.refresh();
-    } catch (error) {
-      console.error("Error deleting product:", error);
-    }
-  };
-
-  const detailItems = [
-    { label: "SKU", value: product.sku },
-    { label: "Piece", value: product.piece },
-    { label: "Name", value: product.name },
-    { label: "Season", value: product.season },
-    {
-      label: "Phase",
-      value: (
-        <span
-          className={`px-2 py-1 rounded-full text-sm ${getPhaseColor(
-            product.phase
-          )}`}
-        >
-          {product.phase}
-        </span>
-      ),
-    },
-    {
-      label: "Materials",
-      value: (
-        <div className="space-y-2">
-          {product.materials?.map((pm) => (
-            <div key={pm.id} className="flex items-center gap-2">
-              <div
-                className="w-4 h-4 rounded-full border"
-                style={{ backgroundColor: pm.material.colorCode }}
-              />
-              <span>
-                {pm.material.type} - {pm.material.color}
-              </span>
-              <span className="text-gray-500">
-                ({pm.quantity} {pm.unit})
-              </span>
-            </div>
-          ))}
-        </div>
-      ),
-    },
-    { label: "Notes", value: product.notes || "No notes" },
-    {
-      label: "Created At",
-      value: new Date(product.createdAt).toLocaleDateString(),
-    },
-    {
-      label: "Updated At",
-      value: new Date(product.updatedAt).toLocaleDateString(),
-    },
-  ];
-
-  return (
-    <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Product Details</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsEditDialogOpen(true)}
-              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
-            >
-              Edit
-            </button>
-            <BackButton />
-          </div>
-        </div>
-        <DetailsView
-          title={`${product.piece} - ${product.name}`}
-          items={detailItems}
-        />
-      </div>
-
-      {isEditDialogOpen && (
-        <DialogComponent
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          title="Edit Product"
-        >
-          <ProductEditForm
-            product={product}
-            onSaveSuccess={handleSave}
-            onDeleteSuccess={handleDelete}
-            onCancel={() => setIsEditDialogOpen(false)}
-            mode="edit"
-          />
-        </DialogComponent>
-      )}
-    </>
-  );
-}
-
-function getPhaseColor(phase: string) {
-  switch (phase) {
-    case "SWATCH":
-      return "bg-blue-100 text-blue-800";
-    case "INITIAL_SAMPLE":
-      return "bg-yellow-100 text-yellow-800";
-    case "FIT_SAMPLE":
-      return "bg-purple-100 text-purple-800";
-    case "PRODUCTION_SAMPLE":
-      return "bg-orange-100 text-orange-800";
-    case "PRODUCTION":
-      return "bg-green-100 text-green-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-}
-
-```
-
-# app/(routes)/products/loading.tsx
-
-```tsx
-export default function ProductsLoading() {
-  return (
-    <div className="w-full h-24 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-    </div>
-  );
-}
-
-```
-
-# app/(routes)/products/page.tsx
-
-```tsx
+```ts
+// app/api/contacts/[contactId]/route.ts
 import { prisma } from "@/lib/prisma";
-import { ProductsControls } from "./products-controls";
+import { NextResponse } from "next/server";
 
-async function getProducts() {
-  const products = await prisma.product.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+export async function GET(
+  _request: Request,
+  { params }: { params: { contactId: string } }
+) {
+  try {
+    const contactId = params.contactId;
 
-  return products;
+    const contact = await prisma.contact.findUnique({
+      where: {
+        id: contactId,
+      },
+    });
+
+    if (!contact) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(contact);
+  } catch (error) {
+    console.error("Error fetching contact:", error);
+    return NextResponse.json(
+      { error: "Error fetching contact" },
+      { status: 500 }
+    );
+  }
 }
 
-export default async function ProductsPage() {
-  const initialProducts = await getProducts();
+export async function PATCH(
+  request: Request,
+  { params }: { params: { contactId: string } }
+) {
+  try {
+    const json = await request.json();
+    const contactId = params.contactId;
 
-  return (
-    <div className="space-y-4">
-      <ProductsControls initialProducts={initialProducts} />
-    </div>
-  );
+    // Ensure the contact exists first
+    const existingContact = await prisma.contact.findUnique({
+      where: { id: contactId },
+    });
+
+    if (!existingContact) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
+
+    // If email is being updated, validate format and uniqueness
+    if (json.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(json.email)) {
+        return NextResponse.json(
+          { error: "Invalid email format" },
+          { status: 400 }
+        );
+      }
+
+      // Check for existing contact with same email, excluding current contact
+      const existingEmailContact = await prisma.contact.findFirst({
+        where: {
+          email: json.email,
+          NOT: {
+            id: contactId,
+          },
+        },
+      });
+
+      if (existingEmailContact) {
+        return NextResponse.json(
+          { error: "A contact with this email already exists" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Update contact
+    const updatedContact = await prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        name: json.name,
+        email: json.email,
+        phone: json.phone,
+        company: json.company,
+        role: json.role,
+        type: json.type,
+        notes: json.notes,
+      },
+    });
+
+    return NextResponse.json(updatedContact);
+  } catch (error) {
+    console.error("Error updating contact:", error);
+    return NextResponse.json(
+      {
+        error: "Error updating contact",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { contactId: string } }
+) {
+  try {
+    const contactId = params.contactId;
+
+    console.log("Attempting to delete contact:", contactId);
+
+    // Check if contact exists
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+    });
+
+    if (!contact) {
+      console.log("Contact not found:", contactId);
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
+
+    // Delete the contact
+    await prisma.contact.delete({
+      where: {
+        id: contactId,
+      },
+    });
+
+    console.log("Contact deleted successfully");
+    return NextResponse.json({
+      message: "Contact deleted successfully",
+      id: contactId,
+    });
+  } catch (error) {
+    console.error("Error during contact deletion:", error);
+    return NextResponse.json(
+      {
+        error: "Error deleting contact",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
 }
 
 ```
 
-# app/(routes)/products/products-controls.tsx
+# app/api/contacts/route.ts
 
-```tsx
-"use client";
+```ts
+// app/api/contacts/route.ts
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
 
-import { ProductsTable } from "@/components/data-tables/products-table";
-import { AddProductDialog } from "@/components/forms/add-product-dialog";
-import { Product } from "@/types/product";
-import { useState } from "react";
+export async function GET() {
+  try {
+    const contacts = await prisma.contact.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-interface ProductsControlsProps {
-  initialProducts: Product[];
+    return NextResponse.json(contacts);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      { error: "Error fetching contacts" },
+      { status: 500 }
+    );
+  }
 }
 
-export function ProductsControls({ initialProducts }: ProductsControlsProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [products, setProducts] = useState(initialProducts);
+export async function POST(request: Request) {
+  try {
+    const json = await request.json();
 
-  const handleAddSuccess = (newProduct: Product) => {
-    setProducts((prevProducts) => [newProduct, ...prevProducts]);
-    setIsAddDialogOpen(false);
-  };
-
-  const handleDelete = async (productId: string) => {
-    try {
-      const response = await fetch(`/api/products/${productId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.log(errorData);
-        throw new Error(errorData.error || "Failed to delete product");
+    // Basic validation
+    const requiredFields = ["name", "email", "type"];
+    for (const field of requiredFields) {
+      if (!json[field]) {
+        return NextResponse.json(
+          { error: `Missing required field: ${field}` },
+          { status: 400 }
+        );
       }
-
-      setProducts((prevProducts) =>
-        prevProducts.filter((p) => p.id !== productId)
-      );
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      throw error;
     }
-  };
 
-  return (
-    <>
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <button
-          onClick={() => setIsAddDialogOpen(true)}
-          className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
-        >
-          Add Product
-        </button>
-      </div>
- 
-      <ProductsTable
-        products={products}
-        onDelete={handleDelete}
-        onUpdate={(updatedProduct) => {
-          setProducts((prevProducts) =>
-            prevProducts.map((p) =>
-              p.id === updatedProduct.id ? updatedProduct : p
-            )
-          );
-        }}
-      />
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(json.email)) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 }
+      );
+    }
 
-      <AddProductDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        onSuccess={handleAddSuccess}
-      />
-    </>
-  );
+    // Check for existing contact with same email
+    const existingContact = await prisma.contact.findUnique({
+      where: { email: json.email },
+    });
+
+    if (existingContact) {
+      return NextResponse.json(
+        { error: "A contact with this email already exists" },
+        { status: 400 }
+      );
+    }
+
+    // Create contact
+    const contact = await prisma.contact.create({
+      data: {
+        name: json.name,
+        email: json.email,
+        phone: json.phone || null,
+        company: json.company || null,
+        role: json.role || null,
+        type: json.type,
+        notes: json.notes || null,
+      },
+    });
+
+    return NextResponse.json(contact);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      {
+        error: "Error creating contact",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
 }
 
 ```
@@ -1708,6 +2320,7 @@ export async function POST(request: Request) {
 # app/api/materials/[materialId]/route.ts
 
 ```ts
+// app/api/materials/[materialId]/route.ts
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -1716,19 +2329,21 @@ export async function GET(
   { params }: { params: { materialId: string } }
 ) {
   try {
+    const materialId = params.materialId;
+
     const material = await prisma.material.findUnique({
       where: {
-        id: params.materialId,
+        id: materialId,
       },
       include: {
+        inventory: {
+          include: {
+            movements: true,
+          },
+        },
         products: {
           include: {
             product: true,
-          },
-        },
-        materialOrderItems: {
-          include: {
-            order: true,
           },
         },
       },
@@ -1743,7 +2358,7 @@ export async function GET(
 
     return NextResponse.json(material);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error fetching material:", error);
     return NextResponse.json(
       { error: "Error fetching material" },
       { status: 500 }
@@ -1757,124 +2372,152 @@ export async function PATCH(
 ) {
   try {
     const json = await request.json();
+    const materialId = params.materialId;
 
-    const material = await prisma.material.update({
-      where: {
-        id: params.materialId,
-      },
-      data: {
-        type: json.type,
-        color: json.color,
-        colorCode: json.colorCode,
-        brand: json.brand,
-        quantity: parseFloat(json.quantity),
-        unit: json.unit,
-        costPerUnit: parseFloat(json.costPerUnit),
-        currency: json.currency,
-        location: json.location,
-        notes: json.notes || null,
-      },
-      include: {
-        products: {
-          include: {
-            product: true,
-          },
-        },
-        materialOrderItems: {
-          include: {
-            order: true,
-          },
-        },
-      },
+    // Ensure the material exists first
+    const existingMaterial = await prisma.material.findUnique({
+      where: { id: materialId },
     });
 
-    return NextResponse.json(material);
+    if (!existingMaterial) {
+      return NextResponse.json(
+        { error: "Material not found" },
+        { status: 404 }
+      );
+    }
+
+    // Update material using transaction to ensure data consistency
+    const updatedMaterial = await prisma.$transaction(async (tx) => {
+      const material = await tx.material.update({
+        where: { id: materialId },
+        data: {
+          // Spread the json but explicitly remove relations to prevent unintended updates
+          ...json,
+          inventory: undefined,
+          products: undefined,
+          // Convert string values to numbers where needed
+          defaultCostPerUnit: json.defaultCostPerUnit
+            ? parseFloat(json.defaultCostPerUnit)
+            : undefined,
+        },
+        include: {
+          inventory: {
+            include: {
+              movements: true,
+            },
+          },
+          products: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      return material;
+    });
+
+    return NextResponse.json(updatedMaterial);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error updating material:", error);
     return NextResponse.json(
-      { error: "Error updating material" },
+      {
+        error: "Error updating material",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: Request,
-  context: { params: Promise<{ materialId: string }> }
+  _request: Request,
+  { params }: { params: { materialId: string } }
 ) {
   try {
-    console.log("----1");
-    // Await the params
-    const { materialId } = await context.params;
-    console.log("----2");
+    const materialId = params.materialId;
 
-    if (!materialId) {
-      return NextResponse.json(
-        { message: "Material ID is required" },
-        { status: 400 }
-      );
-    }
-    console.log("----3");
-    // Check if material exists
-    const existingMaterial = await prisma.material.findUnique({
+    console.log("Attempting to delete material:", materialId);
+
+    // Check if material exists with all relevant relations
+    const material = await prisma.material.findUnique({
       where: { id: materialId },
       include: {
-        _count: {
-          select: {
-            products: true,
-            materialOrderItems: true,
+        inventory: {
+          include: {
+            movements: true,
           },
         },
+        products: true,
       },
     });
 
-    console.log("----4");
-
-    if (!existingMaterial) {
+    if (!material) {
+      console.log("Material not found:", materialId);
       return NextResponse.json(
-        { message: "Material not found" },
+        { error: "Material not found" },
         { status: 404 }
       );
     }
-    console.log("----5");
-    // Check if material is used in any products or orders
-    if (
-      existingMaterial._count.products > 0 ||
-      existingMaterial._count.materialOrderItems > 0
-    ) {
-      return new NextResponse(
-        JSON.stringify({
-          message: "Cannot delete material because it is in use",
-          details: {
-            productsCount: existingMaterial._count.products,
-            ordersCount: existingMaterial._count.materialOrderItems,
-          },
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+
+    // Check if material has any inventory or product relationships
+    if (material.inventory.length > 0 || material.products.length > 0) {
+      // Check if any inventory has movements
+      const hasMovements = material.inventory.some(
+        (inv) => inv.movements.length > 0
+      );
+
+      if (hasMovements) {
+        return NextResponse.json(
+          { error: "Cannot delete material with existing inventory movements" },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete material that is in use by products or has existing inventory",
+        },
+        { status: 400 }
       );
     }
-    console.log("----6");
 
-    // Delete the material
-    await prisma.material.delete({
-      where: {
-        id: materialId,
-      },
+    // Use transaction to ensure all related records are deleted properly
+    await prisma.$transaction(async (tx) => {
+      // Delete all inventory records
+      await tx.inventory.deleteMany({
+        where: {
+          materialId: materialId,
+        },
+      });
+
+      // Delete all product-material relationships
+      await tx.productMaterial.deleteMany({
+        where: {
+          materialId: materialId,
+        },
+      });
+
+      // Finally delete the material
+      await tx.material.delete({
+        where: {
+          id: materialId,
+        },
+      });
     });
 
-    return NextResponse.json(
-      {
-        message: "Material deleted successfully",
-        deletedId: materialId,
-      },
-      { status: 200 }
-    );
+    console.log("Material and related records deleted successfully");
+    return NextResponse.json({
+      message: "Material deleted successfully",
+      id: materialId,
+    });
   } catch (error) {
-    console.error("Error in DELETE API:", error);
+    console.error("Error during material deletion:", error);
     return NextResponse.json(
       {
-        message: "Failed to delete material",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Error deleting material",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
@@ -1891,7 +2534,20 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const materials = await prisma.material.findMany();
+    const materials = await prisma.material.findMany({
+      include: {
+        inventory: true,
+        products: {
+          include: {
+            product: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
     return NextResponse.json(materials);
   } catch (error) {
     console.error("Error:", error);
@@ -1906,22 +2562,18 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
 
-    // Validate required fields
+    // Basic validation
     const requiredFields = [
-      "type",
-      "color",
-      "colorCode",
-      "brand",
-      "quantity",
-      "unit",
-      "costPerUnit",
-      "currency",
-      "location",
+      "type", 
+      "color", 
+      "colorCode", 
+      "brand", 
+      "defaultUnit", 
+      "defaultCostPerUnit",
+      "currency"
     ];
-
     for (const field of requiredFields) {
-      // Changed validation to check for undefined or null
-      if (json[field] === undefined || json[field] === null) {
+      if (!json[field]) {
         return NextResponse.json(
           { error: `Missing required field: ${field}` },
           { status: 400 }
@@ -1929,44 +2581,53 @@ export async function POST(request: Request) {
       }
     }
 
-    // Additional validation for numeric fields
-    if (
-      typeof json.quantity !== "number" &&
-      typeof parseFloat(json.quantity) !== "number"
-    ) {
-      return NextResponse.json(
-        { error: "Quantity must be a number" },
-        { status: 400 }
-      );
-    }
+    // Create material with potential relationships
+    const material = await prisma.$transaction(async (tx) => {
+      // Create the base material
+      const newMaterial = await tx.material.create({
+        data: {
+          type: json.type,
+          color: json.color,
+          colorCode: json.colorCode,
+          brand: json.brand,
+          defaultUnit: json.defaultUnit,
+          defaultCostPerUnit: parseFloat(json.defaultCostPerUnit),
+          currency: json.currency,
+          notes: json.notes || null,
+        },
+      });
 
-    if (
-      typeof json.costPerUnit !== "number" &&
-      typeof parseFloat(json.costPerUnit) !== "number"
-    ) {
-      return NextResponse.json(
-        { error: "Cost per unit must be a number" },
-        { status: 400 }
-      );
-    }
+      // Create inventory if provided
+      if (json.inventory?.length) {
+        await tx.inventory.createMany({
+          data: json.inventory.map((inv: any) => ({
+            type: "MATERIAL",
+            materialId: newMaterial.id,
+            quantity: inv.quantity,
+            unit: inv.unit,
+            location: inv.location,
+            notes: inv.notes,
+          })),
+        });
+      }
 
-    const material = await prisma.material.create({
-      data: {
-        type: json.type,
-        color: json.color,
-        colorCode: json.colorCode,
-        brand: json.brand,
-        quantity: parseFloat(json.quantity),
-        unit: json.unit,
-        costPerUnit: parseFloat(json.costPerUnit),
-        currency: json.currency,
-        location: json.location,
-        notes: json.notes || null,
-        photos: json.photos || [],
+      return newMaterial;
+    });
+
+    // Fetch complete material with relations
+    const materialWithRelations = await prisma.material.findUnique({
+      where: { id: material.id },
+      include: {
+        inventory: true,
+        products: {
+          include: {
+            material: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json(material);
+    return NextResponse.json(materialWithRelations);
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(
@@ -1975,7 +2636,6 @@ export async function POST(request: Request) {
     );
   }
 }
-
 ```
 
 # app/api/products/[productId]/route.ts
@@ -2001,6 +2661,11 @@ export async function GET(
             material: true,
           },
         },
+        inventory: {
+          include: {
+            movements: true,
+          },
+        },
       },
     });
 
@@ -2010,7 +2675,7 @@ export async function GET(
 
     return NextResponse.json(product);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error fetching product:", error);
     return NextResponse.json(
       { error: "Error fetching product" },
       { status: 500 }
@@ -2026,22 +2691,55 @@ export async function PATCH(
     const json = await request.json();
     const productId = params.productId;
 
-    const product = await prisma.product.update({
-      where: {
-        id: productId,
-      },
-      data: json,
+    // Ensure the product exists first
+    const existingProduct = await prisma.product.findUnique({
+      where: { id: productId },
     });
 
-    return NextResponse.json(product);
+    if (!existingProduct) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Update product using transaction to ensure data consistency
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.update({
+        where: { id: productId },
+        data: {
+          // Spread the json but explicitly remove relations to prevent unintended updates
+          ...json,
+          materials: undefined,
+          inventory: undefined,
+        },
+        include: {
+          materials: {
+            include: {
+              material: true,
+            },
+          },
+          inventory: {
+            include: {
+              movements: true,
+            },
+          },
+        },
+      });
+
+      return product;
+    });
+
+    return NextResponse.json(updatedProduct);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error updating product:", error);
     return NextResponse.json(
-      { error: "Error updating product" },
+      { 
+        error: "Error updating product",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
+
 export async function DELETE(
   _request: Request,
   { params }: { params: { productId: string } }
@@ -2051,11 +2749,16 @@ export async function DELETE(
 
     console.log("Attempting to delete product:", productId);
 
-    // First check if product exists
+    // Check if product exists with all relevant relations
     const product = await prisma.product.findUnique({
       where: { id: productId },
       include: {
         materials: true,
+        inventory: {
+          include: {
+            movements: true,
+          },
+        },
       },
     });
 
@@ -2064,16 +2767,50 @@ export async function DELETE(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Use a transaction to ensure all operations complete successfully
+    // Check if product has any inventory
+    if (product.inventory.length > 0) {
+      // Check if any inventory has movements
+      const hasMovements = product.inventory.some(inv => inv.movements.length > 0);
+      
+      if (hasMovements) {
+        return NextResponse.json(
+          { error: "Cannot delete product with existing inventory movements" },
+          { status: 400 }
+        );
+      }
+
+      // If inventory exists but no movements, we can proceed but should warn
+      console.warn("Deleting product with existing inventory but no movements:", productId);
+    }
+
+    // Use transaction to ensure all related records are deleted properly
     await prisma.$transaction(async (tx) => {
-      // First delete all product-material relationships
+      // Delete all inventory movements first (if any exist)
+      if (product.inventory.length > 0) {
+        await tx.transactionItem.deleteMany({
+          where: {
+            inventory: {
+              productId: productId,
+            },
+          },
+        });
+      }
+
+      // Delete all inventory records
+      await tx.inventory.deleteMany({
+        where: {
+          productId: productId,
+        },
+      });
+
+      // Delete all product-material relationships
       await tx.productMaterial.deleteMany({
         where: {
           productId: productId,
         },
       });
 
-      // Then delete the product
+      // Finally delete the product
       await tx.product.delete({
         where: {
           id: productId,
@@ -2087,7 +2824,6 @@ export async function DELETE(
       id: productId,
     });
   } catch (error) {
-    console.log("hello");
     console.error("Error during product deletion:", error);
     return NextResponse.json(
       {
@@ -2098,7 +2834,6 @@ export async function DELETE(
     );
   }
 }
-
 ```
 
 # app/api/products/route.ts
@@ -2110,10 +2845,19 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
+      include: {
+        inventory: true,
+        materials: {
+          include: {
+            material: true,
+          },
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },
     });
+
     return NextResponse.json(products);
   } catch (error) {
     console.error("Error:", error);
@@ -2128,9 +2872,8 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
 
-    // Validate required fields
+    // Basic validation
     const requiredFields = ["sku", "piece", "name", "season", "phase"];
-
     for (const field of requiredFields) {
       if (!json[field]) {
         return NextResponse.json(
@@ -2140,19 +2883,63 @@ export async function POST(request: Request) {
       }
     }
 
-    const product = await prisma.product.create({
-      data: {
-        sku: json.sku,
-        piece: json.piece,
-        name: json.name,
-        season: json.season,
-        phase: json.phase,
-        notes: json.notes || null,
-        photos: json.photos || [],
+    // Create product with potential relationships
+    const product = await prisma.$transaction(async (tx) => {
+      // Create the base product
+      const newProduct = await tx.product.create({
+        data: {
+          sku: json.sku,
+          piece: json.piece,
+          name: json.name,
+          season: json.season,
+          phase: json.phase,
+          notes: json.notes || null,
+          photos: json.photos || [],
+        },
+      });
+
+      // Create inventory if provided
+      if (json.inventory?.length) {
+        await tx.inventory.createMany({
+          data: json.inventory.map((inv: any) => ({
+            type: "PRODUCT",
+            productId: newProduct.id,
+            quantity: inv.quantity,
+            unit: inv.unit,
+            location: inv.location,
+          })),
+        });
+      }
+
+      // Create material associations if provided
+      if (json.materials?.length) {
+        await tx.productMaterial.createMany({
+          data: json.materials.map((mat: any) => ({
+            productId: newProduct.id,
+            materialId: mat.materialId,
+            quantity: mat.quantity,
+            unit: mat.unit,
+          })),
+        });
+      }
+
+      return newProduct;
+    });
+
+    // Fetch complete product with relations
+    const productWithRelations = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        inventory: true,
+        materials: {
+          include: {
+            material: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json(productWithRelations);
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(
@@ -2161,14 +2948,6 @@ export async function POST(request: Request) {
     );
   }
 }
-
-```
-
-# app/api/stylematerial/route.ts
-
-```ts
-// import { prisma } from "@/app/lib/prisma";
-// import { NextResponse } from "next/server";
 
 ```
 
@@ -2219,76 +2998,37 @@ export async function POST(request: Request) {
 
 ```
 
-# app/components/data-tables/contacts-table.tsx
+# app/components/data-tables/data-table.tsx
 
 ```tsx
+// app/components/data-tables/data-table.tsx
 "use client";
 
-import { useState } from "react";
-import { Contact, ContactType } from "@/types/contact";
 import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
 import { useRouter } from "next/navigation";
 
-interface Column {
+export type DataTableColumn<T> = {
   header: string;
-  accessorKey: string;
-  cell?: (item: Contact) => React.ReactNode;
+  accessorKey: keyof T | string;
+  cell?: (item: T) => React.ReactNode;
+};
+
+interface DataTableProps<T> {
+  data: T[];
+  columns: DataTableColumn<T>[];
+  onDelete?: (id: string) => void;
+  onUpdate?: (item: T) => void;
+  viewPath: string;
 }
 
-const columns: Column[] = [
-  {
-    header: "Name",
-    accessorKey: "name",
-  },
-  {
-    header: "Email",
-    accessorKey: "email",
-  },
-  {
-    header: "Phone",
-    accessorKey: "phone",
-  },
-  {
-    header: "Company",
-    accessorKey: "company",
-  },
-  {
-    header: "Role",
-    accessorKey: "role",
-  },
-  {
-    header: "Type",
-    accessorKey: "type",
-    cell: (contact) => (
-      <span
-        className={`px-2 py-1 rounded-full text-sm ${getTypeColor(
-          contact.type
-        )}`}
-      >
-        {contact.type}
-      </span>
-    ),
-  },
-];
-
-function getTypeColor(type: ContactType) {
-  switch (type) {
-    case ContactType.SUPPLIER:
-      return 'bg-blue-100 text-blue-800';
-    case ContactType.MANUFACTURER:
-      return 'bg-purple-100 text-purple-800';
-    case ContactType.CUSTOMER:
-      return 'bg-green-100 text-green-800';
-    case ContactType.OTHER:
-      return 'bg-gray-100 text-gray-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}
-
-export function ContactsTable({ contacts: initialContacts }: { contacts: Contact[] }) {
+export function DataTable<T extends { id: string }>({
+  data,
+  columns,
+  onDelete,
+  onUpdate,
+  viewPath,
+}: DataTableProps<T>) {
   const router = useRouter();
-  const [contacts] = useState(initialContacts);
 
   return (
     <div className="rounded-md border">
@@ -2297,7 +3037,7 @@ export function ContactsTable({ contacts: initialContacts }: { contacts: Contact
           <tr className="border-b bg-gray-50">
             {columns.map((column) => (
               <th
-                key={column.accessorKey}
+                key={String(column.accessorKey)}
                 className="px-4 py-2 text-left text-sm font-medium text-gray-500"
               >
                 {column.header}
@@ -2309,23 +3049,25 @@ export function ContactsTable({ contacts: initialContacts }: { contacts: Contact
           </tr>
         </thead>
         <tbody>
-          {contacts.map((contact) => (
-            <tr key={contact.id} className="border-b hover:bg-gray-50">
+          {data.map((item) => (
+            <tr key={item.id} className="border-b hover:bg-gray-50">
               {columns.map((column) => (
                 <td
-                  key={`${contact.id}-${column.accessorKey}`}
+                  key={`${item.id}-${String(column.accessorKey)}`}
                   className="px-4 py-2 text-sm"
                 >
                   {column.cell
-                    ? column.cell(contact)
-                    : String(contact[column.accessorKey as keyof Contact] || '-')}
+                    ? column.cell(item)
+                    : String(
+                        (item[column.accessorKey as keyof T] as string) || "-"
+                      )}
                 </td>
               ))}
               <td className="px-4 py-2 text-sm">
                 <DataTableRowActions
-                  onView={() => router.push(`/contacts/${contact.id}`)}
-                  onEdit={() => console.log('Edit:', contact.id)}
-                  onDelete={() => console.log('Delete:', contact.id)}
+                  onView={() => router.push(`${viewPath}/${item.id}`)}
+                  onEdit={onUpdate ? () => onUpdate(item) : undefined}
+                  onDelete={onDelete ? () => onDelete(item.id) : undefined}
                 />
               </td>
             </tr>
@@ -2335,6 +3077,7 @@ export function ContactsTable({ contacts: initialContacts }: { contacts: Contact
     </div>
   );
 }
+
 ```
 
 # app/components/data-tables/materials-orders-table.tsx
@@ -2534,374 +3277,13 @@ export function MaterialOrdersTable({
 
 ```
 
-# app/components/data-tables/materials-table.tsx
-
-```tsx
-"use client";
-
-import { MaterialEditForm } from "@/components/forms/material-edit-form";
-import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
-import { DialogComponent } from "@/components/ui/dialog";
-import { Material } from "@/types/material";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-interface MaterialsTableProps {
-  materials: Material[];
-  onDelete?: (materialId: string) => void;
-  onUpdate?: (updatedMaterial: Material) => void;
-}
-
-interface Column {
-  header: string;
-  accessorKey: string;
-  cell?: (item: Material) => React.ReactNode;
-}
-
-const columns: Column[] = [
-  {
-    header: "Type",
-    accessorKey: "type",
-  },
-  {
-    header: "Color",
-    accessorKey: "color",
-    cell: (material) => (
-      <div className="flex items-center gap-2">
-        <div
-          className="w-4 h-4 rounded-full border"
-          style={{ backgroundColor: material.colorCode }}
-        />
-        {material.color}
-      </div>
-    ),
-  },
-  {
-    header: "Quantity",
-    accessorKey: "quantity",
-    cell: (material) => `${material.quantity} ${material.unit}`,
-  },
-  {
-    header: "Location",
-    accessorKey: "location",
-  },
-  {
-    header: "Brand",
-    accessorKey: "brand",
-  },
-];
-
-export function MaterialsTable({
-  materials,
-  onDelete,
-  onUpdate,
-}: MaterialsTableProps) {
-  const router = useRouter();
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(
-    null
-  );
-
-  const handleEdit = (material: Material) => {
-    setSelectedMaterial(material);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleSave = async (updatedMaterial: Partial<Material>) => {
-    if (!selectedMaterial) return;
-
-    try {
-      const response = await fetch(`/api/materials/${selectedMaterial.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedMaterial),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update material");
-      }
-
-      const updated = await response.json();
-
-      if (onUpdate) {
-        onUpdate(updated);
-      }
-
-      setIsEditDialogOpen(false);
-      setSelectedMaterial(null);
-    } catch (error) {
-      console.error("Error updating material:", error);
-    }
-  };
-
-  return (
-    <>
-      <div className="rounded-md border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              {columns.map((column) => (
-                <th
-                  key={column.accessorKey}
-                  className="px-4 py-2 text-left text-sm font-medium text-gray-500"
-                >
-                  {column.header}
-                </th>
-              ))}
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {materials.map((material) => (
-              <tr key={material.id} className="border-b hover:bg-gray-50">
-                {columns.map((column) => (
-                  <td
-                    key={`${material.id}-${column.accessorKey}`}
-                    className="px-4 py-2 text-sm"
-                  >
-                    {column.cell
-                      ? column.cell(material)
-                      : String(material[column.accessorKey as keyof Material])}
-                  </td>
-                ))}
-                <td className="px-4 py-2 text-sm">
-                  <DataTableRowActions
-                    onView={() =>
-                      router.push(`/inventory/materials/${material.id}`)
-                    }
-                    onEdit={() => handleEdit(material)}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {selectedMaterial && (
-        <DialogComponent
-          open={isEditDialogOpen}
-          onOpenChange={(open) => {
-            setIsEditDialogOpen(open);
-            if (!open) setSelectedMaterial(null);
-          }}
-          title="Edit Material"
-        >
-          <MaterialEditForm
-            material={selectedMaterial}
-            onSaveSuccess={handleSave}
-            onDeleteSuccess={onDelete}
-            onCancel={() => {
-              setIsEditDialogOpen(false);
-              setSelectedMaterial(null);
-            }}
-            mode="edit"
-          />
-        </DialogComponent>
-      )}
-    </>
-  );
-}
-
-```
-
-# app/components/data-tables/products-table.tsx
-
-```tsx
-"use client";
-
-import { ProductEditForm } from "@/components/forms/product-edit-form";
-import { DataTableRowActions } from "@/components/ui/data-table-row-actions";
-import { DialogComponent } from "@/components/ui/dialog";
-import { Product } from "@/types/product";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-interface ProductsTableProps {
-  products: Product[];
-  onDelete?: (productId: string) => void;
-  onUpdate?: (updatedProduct: Product) => void;
-}
-
-interface Column {
-  header: string;
-  accessorKey: string;
-  cell?: (item: Product) => React.ReactNode;
-}
-
-const columns: Column[] = [
-  {
-    header: "SKU",
-    accessorKey: "sku",
-  },
-  {
-    header: "Piece",
-    accessorKey: "piece",
-  },
-  {
-    header: "Name",
-    accessorKey: "name",
-  },
-  {
-    header: "Season",
-    accessorKey: "season",
-  },
-  {
-    header: "Phase",
-    accessorKey: "phase",
-    cell: (product) => (
-      <span
-        className={`px-2 py-1 rounded-full text-sm ${getPhaseColor(
-          product.phase
-        )}`}
-      >
-        {product.phase}
-      </span>
-    ),
-  },
-];
-
-function getPhaseColor(phase: string) {
-  switch (phase) {
-    case "SWATCH":
-      return "bg-blue-100 text-blue-800";
-    case "INITIAL_SAMPLE":
-      return "bg-yellow-100 text-yellow-800";
-    case "FIT_SAMPLE":
-      return "bg-purple-100 text-purple-800";
-    case "PRODUCTION_SAMPLE":
-      return "bg-orange-100 text-orange-800";
-    case "PRODUCTION":
-      return "bg-green-100 text-green-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-}
-
-export function ProductsTable({
-  products,
-  onDelete,
-  onUpdate,
-}: ProductsTableProps) {
-  const router = useRouter();
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-  const handleEdit = (product: Product) => {
-    setSelectedProduct(product);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleSave = async (updatedProduct: Partial<Product>) => {
-    if (!selectedProduct) return;
-
-    try {
-      const response = await fetch(`/api/products/${selectedProduct.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedProduct),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update product");
-      }
-
-      const updated = await response.json();
-
-      if (onUpdate) {
-        onUpdate(updated);
-      }
-
-      setIsEditDialogOpen(false);
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error("Error updating product:", error);
-    }
-  };
-
-  return (
-    <>
-      <div className="rounded-md border">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              {columns.map((column) => (
-                <th
-                  key={column.accessorKey}
-                  className="px-4 py-2 text-left text-sm font-medium text-gray-500"
-                >
-                  {column.header}
-                </th>
-              ))}
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((product) => (
-              <tr key={product.id} className="border-b hover:bg-gray-50">
-                {columns.map((column) => (
-                  <td
-                    key={`${product.id}-${column.accessorKey}`}
-                    className="px-4 py-2 text-sm"
-                  >
-                    {column.cell
-                      ? column.cell(product)
-                      : String(product[column.accessorKey as keyof Product])}
-                  </td>
-                ))}
-                <td className="px-4 py-2 text-sm">
-                  <DataTableRowActions
-                    onView={() => router.push(`/products/${product.id}`)}
-                    onEdit={() => handleEdit(product)}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {selectedProduct && (
-        <DialogComponent
-          open={isEditDialogOpen}
-          onOpenChange={(open) => {
-            setIsEditDialogOpen(open);
-            if (!open) setSelectedProduct(null);
-          }}
-          title="Edit Product"
-        >
-          <ProductEditForm
-            product={selectedProduct}
-            onSaveSuccess={handleSave}
-            onDeleteSuccess={onDelete}
-            onCancel={() => {
-              setIsEditDialogOpen(false);
-              setSelectedProduct(null);
-            }}
-            mode="edit"
-          />
-        </DialogComponent>
-      )}
-    </>
-  );
-}
-
-```
-
 # app/components/forms/add-material-dialog.tsx
 
 ```tsx
 import { MaterialEditForm } from "@/components/forms/material-edit-form";
 import { DialogComponent } from "@/components/ui/dialog";
-import { Material, MeasurementUnit } from "@/types/material";
+import { Material } from "@/types/material";
+import { MeasurementUnit } from ".prisma/client";
 
 interface AddMaterialDialogProps {
   open: boolean;
@@ -3119,6 +3501,193 @@ export function AddProductDialog({
 
 ```
 
+# app/components/forms/edit-form.tsx
+
+```tsx
+"use client";
+
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
+import { useState } from "react";
+
+interface EditFormProps<T> {
+  mode?: "edit" | "create";
+  initialData: T;
+  fields: FormField<T>[];
+  onSaveSuccess: (updatedData: T) => void;
+  onDeleteSuccess?: (id: string) => Promise<void>;
+  onCancel: () => void;
+}
+
+interface FormField<T> {
+  key: keyof T;
+  label: string;
+  type: "text" | "number" | "select" | "textarea";
+  options?: string[];
+  required?: boolean;
+}
+
+export function EditForm<T extends { id: string }>({
+  mode = "edit",
+  initialData,
+  fields,
+  onSaveSuccess,
+  onDeleteSuccess,
+  onCancel,
+}: EditFormProps<T>) {
+  const [formData, setFormData] = useState(initialData);
+  const { showToast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      onSaveSuccess(formData);
+      showToast(
+        `Item ${mode === "create" ? "created" : "updated"} successfully`,
+        "success"
+      );
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Failed to save item",
+        "error"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDeleteSuccess) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteSuccess(formData.id);
+      showToast("Item deleted successfully", "success");
+      onCancel();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete item",
+        "error"
+      );
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  return (
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          {fields.map((field) => (
+            <div key={String(field.key)} className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                {field.label}
+              </label>
+              {field.type === "select" ? (
+                <select
+                  value={formData[field.key]}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      [field.key]: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border rounded-md"
+                  required={field.required}
+                >
+                  {field.options?.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              ) : field.type === "textarea" ? (
+                <textarea
+                  value={formData[field.key]}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      [field.key]: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-md"
+                  required={field.required}
+                />
+              ) : (
+                <input
+                  type={field.type}
+                  value={formData[field.key]}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      [field.key]: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border rounded-md"
+                  required={field.required}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-between border-t pt-6 mt-6">
+          {mode === "edit" && onDeleteSuccess && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+            >
+              Delete Item
+            </button>
+          )}
+          <div className="flex gap-3 ml-auto">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+            >
+              {isSaving
+                ? mode === "create"
+                  ? "Creating..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create Item"
+                : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {mode === "edit" && onDeleteSuccess && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="Delete Item"
+          description="Are you sure you want to delete this item? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          isLoading={isDeleting}
+        />
+      )}
+    </>
+  );
+}
+
+```
+
 # app/components/forms/material-edit-form.tsx
 
 ```tsx
@@ -3126,7 +3695,7 @@ export function AddProductDialog({
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
-import { Material, MeasurementUnit } from "@/types/material";
+import { Material, MeasurementUnit } from "@/types/types";
 import { useState } from "react";
 
 interface MaterialEditFormProps {
@@ -3420,8 +3989,13 @@ export function MaterialEditForm({
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
-import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
-import { useState } from "react";
+import { Material } from "@/types/material";
+import {
+  MaterialOrder,
+  MeasurementUnit,
+  OrderStatus,
+} from "@/types/materialOrder";
+import { useEffect, useMemo, useState } from "react";
 
 interface MaterialOrderEditFormProps {
   order: MaterialOrder;
@@ -3429,6 +4003,13 @@ interface MaterialOrderEditFormProps {
   onDeleteSuccess?: (orderId: string) => Promise<void>;
   onCancel: () => void;
   mode?: "edit" | "create";
+}
+
+interface OrderItemFormData {
+  materialId: string;
+  quantity: number;
+  unit: MeasurementUnit;
+  unitPrice: number;
 }
 
 // Helper function to safely format dates
@@ -3447,7 +4028,6 @@ export function MaterialOrderEditForm({
   onCancel,
   mode = "edit",
 }: MaterialOrderEditFormProps) {
-  
   const [formData, setFormData] = useState({
     orderNumber: order.orderNumber,
     supplier: order.supplier,
@@ -3460,15 +4040,136 @@ export function MaterialOrderEditForm({
     notes: order.notes || "",
   });
 
+  const [orderItems, setOrderItems] = useState<OrderItemFormData[]>([]);
+  const [availableMaterials, setAvailableMaterials] = useState<Material[]>([]);
+
   const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Fetch available materials
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        const response = await fetch("/api/materials");
+        const materials = await response.json();
+        setAvailableMaterials(materials);
+      } catch (error) {
+        console.error("Error fetching materials:", error);
+        showToast("Failed to load materials", "error");
+      }
+    };
+
+    fetchMaterials();
+  }, []);
+
+  // New state for stepped selection
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedType, setSelectedType] = useState("");
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
+  const [quantity, setQuantity] = useState<number>(0);
+
+  // Computed values based on available materials
+  const availableBrands = useMemo(() => {
+    const brands = new Set(availableMaterials.map((m) => m.brand));
+    return Array.from(brands).sort();
+  }, [availableMaterials]);
+
+  const availableTypes = useMemo(() => {
+    if (!selectedBrand) return [];
+    const types = new Set(
+      availableMaterials
+        .filter((m) => m.brand === selectedBrand)
+        .map((m) => m.type)
+    );
+    return Array.from(types).sort();
+  }, [selectedBrand, availableMaterials]);
+
+  const availableColors = useMemo(() => {
+    if (!selectedBrand || !selectedType) return [];
+    return availableMaterials
+      .filter((m) => m.brand === selectedBrand && m.type === selectedType)
+      .map((m) => ({
+        id: m.id,
+        color: m.color,
+        colorCode: m.colorCode,
+        costPerUnit: m.costPerUnit,
+        unit: m.unit,
+      }))
+      .sort((a, b) => a.color.localeCompare(b.color));
+  }, [selectedBrand, selectedType, availableMaterials]);
+
+  const selectedMaterial = useMemo(
+    () => availableMaterials.find((m) => m.id === selectedMaterialId),
+    [selectedMaterialId, availableMaterials]
+  );
+
+  // Reset dependent fields when parent selection changes
+  useEffect(() => {
+    setSelectedType("");
+    setSelectedMaterialId("");
+    setQuantity(0);
+  }, [selectedBrand]);
+
+  useEffect(() => {
+    setSelectedMaterialId("");
+    setQuantity(0);
+  }, [selectedType]);
+
+  useEffect(() => {
+    setQuantity(0);
+  }, [selectedMaterialId]);
+
+  const handleAddOrderItem = () => {
+    if (!selectedMaterial || quantity <= 0) {
+      showToast("Please complete all fields", "error");
+      return;
+    }
+
+    const newOrderItem: OrderItemFormData = {
+      materialId: selectedMaterial.id,
+      quantity: quantity,
+      unit: selectedMaterial.unit,
+      unitPrice: selectedMaterial.costPerUnit,
+    };
+
+    setOrderItems([...orderItems, newOrderItem]);
+
+    // Update total price
+    const itemTotal = quantity * selectedMaterial.costPerUnit;
+    setFormData((prev) => ({
+      ...prev,
+      totalPrice: prev.totalPrice + itemTotal,
+    }));
+
+    // Reset selection
+    setSelectedBrand("");
+    setSelectedType("");
+    setSelectedMaterialId("");
+    setQuantity(0);
+  };
+
+  const handleRemoveOrderItem = (index: number) => {
+    const removedItem = orderItems[index];
+    const itemTotal = removedItem.quantity * removedItem.unitPrice;
+
+    setOrderItems(orderItems.filter((_, i) => i !== index));
+    setFormData((prev) => ({
+      ...prev,
+      totalPrice: prev.totalPrice - itemTotal,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+
     try {
+      if (orderItems.length === 0) {
+        throw new Error("Please add at least one material to the order");
+      }
+
       const processedData = {
         ...formData,
         totalPrice: parseFloat(formData.totalPrice.toString()),
@@ -3477,6 +4178,10 @@ export function MaterialOrderEditForm({
         actualDelivery: formData.actualDelivery
           ? new Date(formData.actualDelivery)
           : null,
+        orderItems: orderItems.map((item) => ({
+          ...item,
+          totalPrice: item.quantity * item.unitPrice,
+        })),
       };
 
       onSaveSuccess(processedData as MaterialOrder);
@@ -3514,7 +4219,8 @@ export function MaterialOrderEditForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Existing form fields */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">
@@ -3664,7 +4370,187 @@ export function MaterialOrderEditForm({
           </div>
         </div>
 
-        <div className="flex justify-between border-t pt-6 mt-6">
+        {/* Order Items Section */}
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-semibold mb-4">Order Items</h3>
+
+          {/* Stepped material selection form */}
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            {/* Brand Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Brand</label>
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+              >
+                <option value="">Select Brand</option>
+                {availableBrands.map((brand) => (
+                  <option key={brand} value={brand}>
+                    {brand}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Type Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Type</label>
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+                disabled={!selectedBrand}
+              >
+                <option value="">Select Type</option>
+                {availableTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Color Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Color</label>
+              <select
+                value={selectedMaterialId}
+                onChange={(e) => setSelectedMaterialId(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+                disabled={!selectedType}
+              >
+                <option value="">Select Color</option>
+                {availableColors.map((color) => (
+                  <option key={color.id} value={color.id}>
+                    {color.color} ({color.colorCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Quantity Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Quantity
+              </label>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) =>
+                      setQuantity(
+                        e.target.value === "" ? 0 : parseFloat(e.target.value)
+                      )
+                    }
+                    className="w-full px-3 py-2 border rounded-md"
+                    min="0"
+                    step="0.01"
+                    disabled={!selectedMaterialId}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddOrderItem}
+                  disabled={!selectedMaterialId || quantity <= 0}
+                  className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Display unit price if material is selected */}
+          {selectedMaterial && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-md">
+              <p className="text-sm text-gray-600">
+                Price: {selectedMaterial.costPerUnit} {formData.currency} per{" "}
+                {selectedMaterial.unit}
+                {quantity > 0 && (
+                  <span className="ml-2">
+                    | Total:{" "}
+                    {(quantity * selectedMaterial.costPerUnit).toFixed(2)}{" "}
+                    {formData.currency}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Order items list */}
+          {orderItems.length > 0 && (
+            <div className="border rounded-md overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+                      Material
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+                      Quantity
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+                      Unit Price
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+                      Total
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderItems.map((item, index) => {
+                    const material = availableMaterials.find(
+                      (m) => m.id === item.materialId
+                    );
+                    return (
+                      <tr key={index} className="border-t">
+                        <td className="px-4 py-2">
+                          {material && (
+                            <>
+                              <div>
+                                {material.brand} - {material.type}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {material.color} ({material.colorCode})
+                              </div>
+                            </>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {item.quantity} {item.unit}
+                        </td>
+                        <td className="px-4 py-2">
+                          {item.unitPrice} {formData.currency}
+                        </td>
+                        <td className="px-4 py-2">
+                          {(item.quantity * item.unitPrice).toFixed(2)}{" "}
+                          {formData.currency}
+                        </td>
+                        <td className="px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveOrderItem(index)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Form Actions */}
+        <div className="flex justify-between border-t pt-6">
           {mode === "edit" && onDeleteSuccess && (
             <button
               type="button"
@@ -3684,7 +4570,7 @@ export function MaterialOrderEditForm({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || orderItems.length === 0}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
               {isSaving
@@ -3713,6 +4599,826 @@ export function MaterialOrderEditForm({
     </>
   );
 }
+
+// "use client";
+
+// import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+// import { useToast } from "@/components/ui/toast";
+// import { Material } from "@/types/material";
+// import { MaterialOrder, MaterialOrderItem, MeasurementUnit, OrderStatus } from "@/types/materialOrder";
+// import { useState, useEffect, useMemo } from "react";
+
+// interface MaterialOrderEditFormProps {
+//   order: MaterialOrder;
+//   onSaveSuccess: (updatedOrder: MaterialOrder) => void;
+//   onDeleteSuccess?: (orderId: string) => Promise<void>;
+//   onCancel: () => void;
+//   mode?: "edit" | "create";
+// }
+
+// interface OrderItemFormData {
+//   materialId: string;
+//   quantity: number;
+//   unit: MeasurementUnit;
+//   unitPrice: number;
+// }
+
+// // Helper function to safely format dates
+// const formatDate = (date: Date | string | null | undefined) => {
+//   if (!date) return "";
+//   const d = typeof date === "string" ? new Date(date) : date;
+//   return d instanceof Date && !isNaN(d.getTime())
+//     ? d.toISOString().split("T")[0]
+//     : "";
+// };
+
+// export function MaterialOrderEditForm({
+//   order,
+//   onSaveSuccess,
+//   onDeleteSuccess,
+//   onCancel,
+//   mode = "edit",
+// }: MaterialOrderEditFormProps) {
+//   const [formData, setFormData] = useState({
+//     orderNumber: order.orderNumber,
+//     supplier: order.supplier,
+//     status: order.status,
+//     totalPrice: order.totalPrice,
+//     currency: order.currency,
+//     orderDate: formatDate(order.orderDate),
+//     expectedDelivery: formatDate(order.expectedDelivery),
+//     actualDelivery: formatDate(order.actualDelivery),
+//     notes: order.notes || "",
+//   });
+
+//   const [orderItems, setOrderItems] = useState<OrderItemFormData[]>([]);
+//   const [availableMaterials, setAvailableMaterials] = useState<Material[]>([]);
+//   const [newItem, setNewItem] = useState<OrderItemFormData>({
+//     materialId: "",
+//     quantity: 0,
+//     unit: MeasurementUnit.KILOGRAM,
+//     unitPrice: 0,
+//   });
+
+//   const { showToast } = useToast();
+//   const [isSaving, setIsSaving] = useState(false);
+//   const [isDeleting, setIsDeleting] = useState(false);
+//   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+//   const handleAddOrderItem = () => {
+//     if (
+//       !newItem.materialId ||
+//       newItem.quantity <= 0 ||
+//       newItem.unitPrice <= 0
+//     ) {
+//       showToast("Please fill in all order item fields", "error");
+//       return;
+//     }
+
+//     setOrderItems([...orderItems, newItem]);
+//     setNewItem({
+//       materialId: "",
+//       quantity: 0,
+//       unit: MeasurementUnit.KILOGRAM,
+//       unitPrice: 0,
+//     });
+
+//     // Update total price
+//     const itemTotal = newItem.quantity * newItem.unitPrice;
+//     setFormData((prev) => ({
+//       ...prev,
+//       totalPrice: prev.totalPrice + itemTotal,
+//     }));
+//   };
+
+//   const handleRemoveOrderItem = (index: number) => {
+//     const removedItem = orderItems[index];
+//     const itemTotal = removedItem.quantity * removedItem.unitPrice;
+
+//     setOrderItems(orderItems.filter((_, i) => i !== index));
+//     setFormData((prev) => ({
+//       ...prev,
+//       totalPrice: prev.totalPrice - itemTotal,
+//     }));
+//   };
+
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     setIsSaving(true);
+
+//     try {
+//       if (orderItems.length === 0) {
+//         throw new Error("Please add at least one material to the order");
+//       }
+
+//       const processedData = {
+//         ...formData,
+//         totalPrice: parseFloat(formData.totalPrice.toString()),
+//         orderDate: new Date(formData.orderDate),
+//         expectedDelivery: new Date(formData.expectedDelivery),
+//         actualDelivery: formData.actualDelivery
+//           ? new Date(formData.actualDelivery)
+//           : null,
+//         orderItems: orderItems.map((item) => ({
+//           ...item,
+//           totalPrice: item.quantity * item.unitPrice,
+//         })),
+//       };
+
+//       onSaveSuccess(processedData as MaterialOrder);
+//       showToast(
+//         `Order ${mode === "create" ? "created" : "updated"} successfully`,
+//         "success"
+//       );
+//     } catch (error) {
+//       showToast(
+//         error instanceof Error ? error.message : "Failed to save order",
+//         "error"
+//       );
+//     } finally {
+//       setIsSaving(false);
+//     }
+//   };
+
+//   const handleDelete = async () => {
+//     if (!onDeleteSuccess) return;
+//     setIsDeleting(true);
+//     try {
+//       await onDeleteSuccess(order.id);
+//       showToast("Order deleted successfully", "success");
+//       onCancel();
+//     } catch (error) {
+//       showToast(
+//         error instanceof Error ? error.message : "Failed to delete order",
+//         "error"
+//       );
+//     } finally {
+//       setIsDeleting(false);
+//       setShowDeleteConfirm(false);
+//     }
+//   };
+
+//   return (
+//     <>
+//       <form onSubmit={handleSubmit} className="space-y-6">
+//         {/* Existing form fields */}
+//         <div className="grid grid-cols-2 gap-4">
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-gray-700">
+//               Order Number
+//             </label>
+//             <input
+//               type="text"
+//               value={formData.orderNumber}
+//               onChange={(e) =>
+//                 setFormData((prev) => ({
+//                   ...prev,
+//                   orderNumber: e.target.value,
+//                 }))
+//               }
+//               className="w-full px-3 py-2 border rounded-md"
+//               required
+//             />
+//           </div>
+
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-gray-700">
+//               Supplier
+//             </label>
+//             <input
+//               type="text"
+//               value={formData.supplier}
+//               onChange={(e) =>
+//                 setFormData((prev) => ({ ...prev, supplier: e.target.value }))
+//               }
+//               className="w-full px-3 py-2 border rounded-md"
+//               required
+//             />
+//           </div>
+
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-gray-700">Status</label>
+//             <select
+//               value={formData.status}
+//               onChange={(e) =>
+//                 setFormData((prev) => ({
+//                   ...prev,
+//                   status: e.target.value as OrderStatus,
+//                 }))
+//               }
+//               className="w-full px-3 py-2 border rounded-md"
+//               required
+//             >
+//               {Object.values(OrderStatus).map((status) => (
+//                 <option key={status} value={status}>
+//                   {status}
+//                 </option>
+//               ))}
+//             </select>
+//           </div>
+
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-gray-700">
+//               Total Price
+//             </label>
+//             <div className="flex gap-2">
+//               <input
+//                 type="number"
+//                 step="0.01"
+//                 value={formData.totalPrice}
+//                 onChange={(e) =>
+//                   setFormData((prev) => ({
+//                     ...prev,
+//                     totalPrice: parseFloat(e.target.value),
+//                   }))
+//                 }
+//                 className="flex-1 px-3 py-2 border rounded-md"
+//                 required
+//               />
+//               <input
+//                 type="text"
+//                 value={formData.currency}
+//                 onChange={(e) =>
+//                   setFormData((prev) => ({ ...prev, currency: e.target.value }))
+//                 }
+//                 className="w-20 px-3 py-2 border rounded-md"
+//                 placeholder="USD"
+//                 required
+//               />
+//             </div>
+//           </div>
+
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-gray-700">
+//               Order Date
+//             </label>
+//             <input
+//               type="date"
+//               value={formData.orderDate}
+//               onChange={(e) =>
+//                 setFormData((prev) => ({ ...prev, orderDate: e.target.value }))
+//               }
+//               className="w-full px-3 py-2 border rounded-md"
+//               required
+//             />
+//           </div>
+
+//           <div className="space-y-2">
+//             <label className="text-sm font-medium text-gray-700">
+//               Expected Delivery
+//             </label>
+//             <input
+//               type="date"
+//               value={formData.expectedDelivery}
+//               onChange={(e) =>
+//                 setFormData((prev) => ({
+//                   ...prev,
+//                   expectedDelivery: e.target.value,
+//                 }))
+//               }
+//               className="w-full px-3 py-2 border rounded-md"
+//               required
+//             />
+//           </div>
+
+//           <div className="space-y-2 col-span-2">
+//             <label className="text-sm font-medium text-gray-700">
+//               Actual Delivery
+//             </label>
+//             <input
+//               type="date"
+//               value={formData.actualDelivery}
+//               onChange={(e) =>
+//                 setFormData((prev) => ({
+//                   ...prev,
+//                   actualDelivery: e.target.value,
+//                 }))
+//               }
+//               className="w-full px-3 py-2 border rounded-md"
+//             />
+//           </div>
+
+//           <div className="space-y-2 col-span-2">
+//             <label className="text-sm font-medium text-gray-700">Notes</label>
+//             <textarea
+//               value={formData.notes}
+//               onChange={(e) =>
+//                 setFormData((prev) => ({ ...prev, notes: e.target.value }))
+//               }
+//               rows={3}
+//               className="w-full px-3 py-2 border rounded-md"
+//             />
+//           </div>
+//         </div>
+
+//         {/* Order Items Section */}
+//         <div className="border-t pt-6">
+//           <h3 className="text-lg font-semibold mb-4">Order Items</h3>
+
+//           {/* Add new item form */}
+//           <div className="grid grid-cols-4 gap-4 mb-4">
+//             <div className="space-y-2">
+//               <label className="text-sm font-medium text-gray-700">
+//                 Material
+//               </label>
+//               <select
+//                 value={newItem.materialId}
+//                 onChange={(e) =>
+//                   setNewItem((prev) => ({
+//                     ...prev,
+//                     materialId: e.target.value,
+//                   }))
+//                 }
+//                 className="w-full px-3 py-2 border rounded-md"
+//               >
+//                 <option value="">Select Material</option>
+//                 {availableMaterials.map((material) => (
+//                   <option key={material.id} value={material.id}>
+//                     {material.type} - {material.color}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+
+//             <div className="space-y-2">
+//               <label className="text-sm font-medium text-gray-700">
+//                 Quantity
+//               </label>
+//               <input
+//                 type="number"
+//                 value={newItem.quantity}
+//                 onChange={(e) =>
+//                   setNewItem((prev) => ({
+//                     ...prev,
+//                     quantity: parseFloat(e.target.value),
+//                   }))
+//                 }
+//                 className="w-full px-3 py-2 border rounded-md"
+//                 min="0"
+//                 step="0.01"
+//               />
+//             </div>
+
+//             <div className="space-y-2">
+//               <label className="text-sm font-medium text-gray-700">Unit</label>
+//               <select
+//                 value={newItem.unit}
+//                 onChange={(e) =>
+//                   setNewItem((prev) => ({
+//                     ...prev,
+//                     unit: e.target.value as MeasurementUnit,
+//                   }))
+//                 }
+//                 className="w-full px-3 py-2 border rounded-md"
+//               >
+//                 {Object.values(MeasurementUnit).map((unit) => (
+//                   <option key={unit} value={unit}>
+//                     {unit}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+
+//             <div className="space-y-2">
+//               <label className="text-sm font-medium text-gray-700">
+//                 Unit Price
+//               </label>
+//               <div className="flex gap-2">
+//                 <input
+//                   type="number"
+//                   value={newItem.unitPrice}
+//                   onChange={(e) =>
+//                     setNewItem((prev) => ({
+//                       ...prev,
+//                       unitPrice: parseFloat(e.target.value),
+//                     }))
+//                   }
+//                   className="w-full px-3 py-2 border rounded-md"
+//                   min="0"
+//                   step="0.01"
+//                 />
+//                 <button
+//                   type="button"
+//                   onClick={handleAddOrderItem}
+//                   className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
+//                 >
+//                   Add
+//                 </button>
+//               </div>
+//             </div>
+//           </div>
+
+//           {/* Order items list */}
+//           {orderItems.length > 0 && (
+//             <div className="border rounded-md overflow-hidden">
+//               <table className="w-full">
+//                 <thead className="bg-gray-50">
+//                   <tr>
+//                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+//                       Material
+//                     </th>
+//                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+//                       Quantity
+//                     </th>
+//                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+//                       Unit Price
+//                     </th>
+//                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+//                       Total
+//                     </th>
+//                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
+//                       Actions
+//                     </th>
+//                   </tr>
+//                 </thead>
+//                 <tbody>
+//                   {orderItems.map((item, index) => {
+//                     const material = availableMaterials.find(
+//                       (m) => m.id === item.materialId
+//                     );
+//                     return (
+//                       <tr key={index} className="border-t">
+//                         <td className="px-4 py-2">
+//                           {material
+//                             ? `${material.type} - ${material.color}`
+//                             : "Unknown"}
+//                         </td>
+//                         <td className="px-4 py-2">
+//                           {item.quantity} {item.unit}
+//                         </td>
+//                         <td className="px-4 py-2">
+//                           {item.unitPrice} {formData.currency}
+//                         </td>
+//                         <td className="px-4 py-2">
+//                           {(item.quantity * item.unitPrice).toFixed(2)}{" "}
+//                           {formData.currency}
+//                         </td>
+//                         <td className="px-4 py-2">
+//                           <button
+//                             type="button"
+//                             onClick={() => handleRemoveOrderItem(index)}
+//                             className="text-red-600 hover:text-red-800"
+//                           >
+//                             Remove
+//                           </button>
+//                         </td>
+//                       </tr>
+//                     );
+//                   })}
+//                 </tbody>
+//               </table>
+//             </div>
+//           )}
+//         </div>
+
+//         {/* Form Actions */}
+//         <div className="flex justify-between border-t pt-6">
+//           {mode === "edit" && onDeleteSuccess && (
+//             <button
+//               type="button"
+//               onClick={() => setShowDeleteConfirm(true)}
+//               className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+//             >
+//               Delete Order
+//             </button>
+//           )}
+//           <div className="flex gap-3 ml-auto">
+//             <button
+//               type="button"
+//               onClick={onCancel}
+//               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+//             >
+//               Cancel
+//             </button>
+//             <button
+//               type="submit"
+//               disabled={isSaving || orderItems.length === 0}
+//               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+//             >
+//               {isSaving
+//                 ? mode === "create"
+//                   ? "Creating..."
+//                   : "Saving..."
+//                 : mode === "create"
+//                 ? "Create Order"
+//                 : "Save Changes"}
+//             </button>
+//           </div>
+//         </div>
+//       </form>
+
+//       {mode === "edit" && onDeleteSuccess && (
+//         <ConfirmDialog
+//           open={showDeleteConfirm}
+//           onOpenChange={setShowDeleteConfirm}
+//           title="Delete Order"
+//           description="Are you sure you want to delete this order? This action cannot be undone."
+//           onConfirm={handleDelete}
+//           onCancel={() => setShowDeleteConfirm(false)}
+//           isLoading={isDeleting}
+//         />
+//       )}
+//     </>
+//   );
+// }
+
+// // "use client";
+
+// // import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+// // import { useToast } from "@/components/ui/toast";
+// // import { MaterialOrder, OrderStatus } from "@/types/materialOrder";
+// // import { useState } from "react";
+
+// // interface MaterialOrderEditFormProps {
+// //   order: MaterialOrder;
+// //   onSaveSuccess: (updatedOrder: MaterialOrder) => void;
+// //   onDeleteSuccess?: (orderId: string) => Promise<void>;
+// //   onCancel: () => void;
+// //   mode?: "edit" | "create";
+// // }
+
+// // // Helper function to safely format dates
+// // const formatDate = (date: Date | string | null | undefined) => {
+// //   if (!date) return "";
+// //   const d = typeof date === "string" ? new Date(date) : date;
+// //   return d instanceof Date && !isNaN(d.getTime())
+// //     ? d.toISOString().split("T")[0]
+// //     : "";
+// // };
+
+// // export function MaterialOrderEditForm({
+// //   order,
+// //   onSaveSuccess,
+// //   onDeleteSuccess,
+// //   onCancel,
+// //   mode = "edit",
+// // }: MaterialOrderEditFormProps) {
+
+// //   const [formData, setFormData] = useState({
+// //     orderNumber: order.orderNumber,
+// //     supplier: order.supplier,
+// //     status: order.status,
+// //     totalPrice: order.totalPrice,
+// //     currency: order.currency,
+// //     orderDate: formatDate(order.orderDate),
+// //     expectedDelivery: formatDate(order.expectedDelivery),
+// //     actualDelivery: formatDate(order.actualDelivery),
+// //     notes: order.notes || "",
+// //   });
+
+// //   const { showToast } = useToast();
+// //   const [isSaving, setIsSaving] = useState(false);
+// //   const [isDeleting, setIsDeleting] = useState(false);
+// //   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+// //   const handleSubmit = async (e: React.FormEvent) => {
+// //     e.preventDefault();
+// //     setIsSaving(true);
+// //     try {
+// //       const processedData = {
+// //         ...formData,
+// //         totalPrice: parseFloat(formData.totalPrice.toString()),
+// //         orderDate: new Date(formData.orderDate),
+// //         expectedDelivery: new Date(formData.expectedDelivery),
+// //         actualDelivery: formData.actualDelivery
+// //           ? new Date(formData.actualDelivery)
+// //           : null,
+// //       };
+
+// //       onSaveSuccess(processedData as MaterialOrder);
+// //       showToast(
+// //         `Order ${mode === "create" ? "created" : "updated"} successfully`,
+// //         "success"
+// //       );
+// //     } catch (error) {
+// //       showToast(
+// //         error instanceof Error ? error.message : "Failed to save order",
+// //         "error"
+// //       );
+// //     } finally {
+// //       setIsSaving(false);
+// //     }
+// //   };
+
+// //   const handleDelete = async () => {
+// //     if (!onDeleteSuccess) return;
+// //     setIsDeleting(true);
+// //     try {
+// //       await onDeleteSuccess(order.id);
+// //       showToast("Order deleted successfully", "success");
+// //       onCancel();
+// //     } catch (error) {
+// //       showToast(
+// //         error instanceof Error ? error.message : "Failed to delete order",
+// //         "error"
+// //       );
+// //     } finally {
+// //       setIsDeleting(false);
+// //       setShowDeleteConfirm(false);
+// //     }
+// //   };
+
+// //   return (
+// //     <>
+// //       <form onSubmit={handleSubmit} className="space-y-4">
+// //         <div className="grid grid-cols-2 gap-4">
+// //           <div className="space-y-2">
+// //             <label className="text-sm font-medium text-gray-700">
+// //               Order Number
+// //             </label>
+// //             <input
+// //               type="text"
+// //               value={formData.orderNumber}
+// //               onChange={(e) =>
+// //                 setFormData((prev) => ({
+// //                   ...prev,
+// //                   orderNumber: e.target.value,
+// //                 }))
+// //               }
+// //               className="w-full px-3 py-2 border rounded-md"
+// //               required
+// //             />
+// //           </div>
+
+// //           <div className="space-y-2">
+// //             <label className="text-sm font-medium text-gray-700">
+// //               Supplier
+// //             </label>
+// //             <input
+// //               type="text"
+// //               value={formData.supplier}
+// //               onChange={(e) =>
+// //                 setFormData((prev) => ({ ...prev, supplier: e.target.value }))
+// //               }
+// //               className="w-full px-3 py-2 border rounded-md"
+// //               required
+// //             />
+// //           </div>
+
+// //           <div className="space-y-2">
+// //             <label className="text-sm font-medium text-gray-700">Status</label>
+// //             <select
+// //               value={formData.status}
+// //               onChange={(e) =>
+// //                 setFormData((prev) => ({
+// //                   ...prev,
+// //                   status: e.target.value as OrderStatus,
+// //                 }))
+// //               }
+// //               className="w-full px-3 py-2 border rounded-md"
+// //               required
+// //             >
+// //               {Object.values(OrderStatus).map((status) => (
+// //                 <option key={status} value={status}>
+// //                   {status}
+// //                 </option>
+// //               ))}
+// //             </select>
+// //           </div>
+
+// //           <div className="space-y-2">
+// //             <label className="text-sm font-medium text-gray-700">
+// //               Total Price
+// //             </label>
+// //             <div className="flex gap-2">
+// //               <input
+// //                 type="number"
+// //                 step="0.01"
+// //                 value={formData.totalPrice}
+// //                 onChange={(e) =>
+// //                   setFormData((prev) => ({
+// //                     ...prev,
+// //                     totalPrice: parseFloat(e.target.value),
+// //                   }))
+// //                 }
+// //                 className="flex-1 px-3 py-2 border rounded-md"
+// //                 required
+// //               />
+// //               <input
+// //                 type="text"
+// //                 value={formData.currency}
+// //                 onChange={(e) =>
+// //                   setFormData((prev) => ({ ...prev, currency: e.target.value }))
+// //                 }
+// //                 className="w-20 px-3 py-2 border rounded-md"
+// //                 placeholder="USD"
+// //                 required
+// //               />
+// //             </div>
+// //           </div>
+
+// //           <div className="space-y-2">
+// //             <label className="text-sm font-medium text-gray-700">
+// //               Order Date
+// //             </label>
+// //             <input
+// //               type="date"
+// //               value={formData.orderDate}
+// //               onChange={(e) =>
+// //                 setFormData((prev) => ({ ...prev, orderDate: e.target.value }))
+// //               }
+// //               className="w-full px-3 py-2 border rounded-md"
+// //               required
+// //             />
+// //           </div>
+
+// //           <div className="space-y-2">
+// //             <label className="text-sm font-medium text-gray-700">
+// //               Expected Delivery
+// //             </label>
+// //             <input
+// //               type="date"
+// //               value={formData.expectedDelivery}
+// //               onChange={(e) =>
+// //                 setFormData((prev) => ({
+// //                   ...prev,
+// //                   expectedDelivery: e.target.value,
+// //                 }))
+// //               }
+// //               className="w-full px-3 py-2 border rounded-md"
+// //               required
+// //             />
+// //           </div>
+
+// //           <div className="space-y-2 col-span-2">
+// //             <label className="text-sm font-medium text-gray-700">
+// //               Actual Delivery
+// //             </label>
+// //             <input
+// //               type="date"
+// //               value={formData.actualDelivery}
+// //               onChange={(e) =>
+// //                 setFormData((prev) => ({
+// //                   ...prev,
+// //                   actualDelivery: e.target.value,
+// //                 }))
+// //               }
+// //               className="w-full px-3 py-2 border rounded-md"
+// //             />
+// //           </div>
+
+// //           <div className="space-y-2 col-span-2">
+// //             <label className="text-sm font-medium text-gray-700">Notes</label>
+// //             <textarea
+// //               value={formData.notes}
+// //               onChange={(e) =>
+// //                 setFormData((prev) => ({ ...prev, notes: e.target.value }))
+// //               }
+// //               rows={3}
+// //               className="w-full px-3 py-2 border rounded-md"
+// //             />
+// //           </div>
+// //         </div>
+
+// //         <div className="flex justify-between border-t pt-6 mt-6">
+// //           {mode === "edit" && onDeleteSuccess && (
+// //             <button
+// //               type="button"
+// //               onClick={() => setShowDeleteConfirm(true)}
+// //               className="px-4 py-2 text-sm text-red-600 hover:text-red-800"
+// //             >
+// //               Delete Order
+// //             </button>
+// //           )}
+// //           <div className="flex gap-3 ml-auto">
+// //             <button
+// //               type="button"
+// //               onClick={onCancel}
+// //               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+// //             >
+// //               Cancel
+// //             </button>
+// //             <button
+// //               type="submit"
+// //               disabled={isSaving}
+// //               className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+// //             >
+// //               {isSaving
+// //                 ? mode === "create"
+// //                   ? "Creating..."
+// //                   : "Saving..."
+// //                 : mode === "create"
+// //                 ? "Create Order"
+// //                 : "Save Changes"}
+// //             </button>
+// //           </div>
+// //         </div>
+// //       </form>
+
+// //       {mode === "edit" && onDeleteSuccess && (
+// //         <ConfirmDialog
+// //           open={showDeleteConfirm}
+// //           onOpenChange={setShowDeleteConfirm}
+// //           title="Delete Order"
+// //           description="Are you sure you want to delete this order? This action cannot be undone."
+// //           onConfirm={handleDelete}
+// //           onCancel={() => setShowDeleteConfirm(false)}
+// //           isLoading={isDeleting}
+// //         />
+// //       )}
+// //     </>
+// //   );
+// // }
 
 ```
 
@@ -3972,13 +5678,13 @@ const mainNavItems = [
     title: "Dashboard",
     href: "/dashboard",
   },
+  // { da riaggiungere quando abbiamo le diverse stagioni
+  //   title: "Catalog",
+  //   href: "/catalog",
+  // },
   {
     title: "Inventory",
     href: "/inventory",
-  },
-  {
-    title: "Products",
-    href: "/products",
   },
   {
     title: "Operations",
@@ -4739,129 +6445,225 @@ export default function Home() {
 
 ```
 
-# app/types/contact.ts
+# app/types/types.ts
 
 ```ts
-export enum ContactType {
-  SUPPLIER = 'SUPPLIER',
-  MANUFACTURER = 'MANUFACTURER',
-  CUSTOMER = 'CUSTOMER',
-  OTHER = 'OTHER'
+// Common fields that all entities share
+type BaseEntity = {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  notes?: string | null;
+};
+
+// Enums
+export enum InventoryType {
+  MATERIAL = "MATERIAL",
+  PRODUCT = "PRODUCT",
 }
 
-export interface Contact {
-  id: string;
+export enum Role {
+  ADMIN = "ADMIN",
+  USER = "USER",
+  PRODUCTION_MANAGER = "PRODUCTION_MANAGER",
+  INVENTORY_MANAGER = "INVENTORY_MANAGER",
+}
+
+export enum MeasurementUnit {
+  GRAM = "GRAM",
+  KILOGRAM = "KILOGRAM",
+  METER = "METER",
+  YARD = "YARD",
+}
+
+export enum TransactionType {
+  INCOMING = "INCOMING",
+  OUTGOING = "OUTGOING",
+}
+
+export enum TransactionStatus {
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  SHIPPED = "SHIPPED",
+  DELIVERED = "DELIVERED",
+  CANCELLED = "CANCELLED",
+}
+
+export enum MovementType {
+  RECEIVED = "RECEIVED",
+  CONSUMED = "CONSUMED",
+  ADJUSTED = "ADJUSTED",
+  RETURNED = "RETURNED",
+  SCRAPPED = "SCRAPPED",
+}
+
+export enum ContactType {
+  SUPPLIER = "SUPPLIER",
+  MANUFACTURER = "MANUFACTURER",
+  CUSTOMER = "CUSTOMER",
+  OTHER = "OTHER",
+}
+
+export enum Phase {
+  SWATCH = "SWATCH",
+  INITIAL_SAMPLE = "INITIAL_SAMPLE",
+  FIT_SAMPLE = "FIT_SAMPLE",
+  PRODUCTION_SAMPLE = "PRODUCTION_SAMPLE",
+  PRODUCTION = "PRODUCTION",
+}
+
+// Domain Models
+export type User = BaseEntity & {
+  email: string;
+  name?: string | null;
+  role: Role;
+};
+
+export type Inventory = BaseEntity & {
+  type: InventoryType;
+  quantity: number;
+  unit: MeasurementUnit;
+  location: string;
+
+  // Polymorphic relationship fields
+  materialId?: string | null;
+  material?: Material | null;
+  productId?: string | null;
+  product?: Product | null;
+
+  // Relations
+  movements: TransactionItem[];
+};
+
+export type Transaction = BaseEntity & {
+  type: InventoryType;
+  transactionType: TransactionType;
+  referenceNumber?: string | null;
+  supplier?: string | null;
+  recipient?: string | null;
+  totalPrice?: number | null;
+  currency?: string | null;
+  orderDate: Date;
+  expectedDelivery?: Date | null;
+  actualDelivery?: Date | null;
+  status: TransactionStatus;
+
+  // Relations
+  items: TransactionItem[];
+};
+
+export type TransactionItem = BaseEntity & {
+  transactionId: string;
+  transaction: Transaction;
+  inventoryId: string;
+  inventory: Inventory;
+  quantity: number;
+  unit: MeasurementUnit;
+  unitPrice?: number | null;
+  totalPrice?: number | null;
+};
+
+export type Material = BaseEntity & {
+  type: string;
+  color: string;
+  colorCode: string;
+  brand: string;
+  defaultUnit: MeasurementUnit;
+  defaultCostPerUnit: number;
+  currency: string;
+
+  // Relations
+  inventory: Inventory[];
+  products: ProductMaterial[];
+};
+
+export type Product = BaseEntity & {
+  sku: string;
+  piece: string;
+  name: string;
+  season: string;
+  phase: Phase;
+  photos: string[];
+
+  // Relations
+  materials: ProductMaterial[];
+  inventory: Inventory[];
+};
+
+export type ProductMaterial = BaseEntity & {
+  productId: string;
+  product: Product;
+  materialId: string;
+  material: Material;
+  quantity: number;
+  unit: MeasurementUnit;
+};
+
+export type Contact = BaseEntity & {
   name: string;
   email: string;
   phone?: string | null;
   company?: string | null;
   role?: string | null;
   type: ContactType;
-  notes?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
+};
 
-# app/types/material.ts
+// Utility types for create/update operations
+export type CreateInventoryInput = Omit<
+  Inventory,
+  "id" | "createdAt" | "updatedAt" | "movements"
+>;
+export type UpdateInventoryInput = Partial<CreateInventoryInput>;
 
-```ts
-export enum MeasurementUnit {
-  GRAM = 'GRAM',
-  KILOGRAM = 'KILOGRAM',
-  METER = 'METER',
-  YARD = 'YARD',
-}
+export type CreateTransactionInput = Omit<
+  Transaction,
+  "id" | "createdAt" | "updatedAt" | "items"
+> & {
+  items: Omit<
+    TransactionItem,
+    "id" | "createdAt" | "updatedAt" | "transaction"
+  >[];
+};
+export type UpdateTransactionInput = Partial<CreateTransactionInput>;
 
-export interface Material {
-  id: string;
-  type: string;
-  color: string;
-  colorCode: string;
-  brand: string;
-  quantity: number;
-  unit: MeasurementUnit;
-  costPerUnit: number;
-  currency: string;
-  location: string;
-  notes?: string;
-  photos: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type CreateMaterialInput = Omit<
+  Material,
+  "id" | "createdAt" | "updatedAt" | "inventory" | "products"
+>;
+export type UpdateMaterialInput = Partial<CreateMaterialInput>;
 
-```
+export type CreateProductInput = Omit<
+  Product,
+  "id" | "createdAt" | "updatedAt" | "materials" | "inventory"
+>;
+export type UpdateProductInput = Partial<CreateProductInput>;
 
-# app/types/materialOrder.ts
+// Response types for API endpoints
+export type InventoryWithRelations = Inventory & {
+  material?: Material;
+  product?: Product;
+  movements: TransactionItem[];
+};
 
-```ts
-// types/materialOrder.ts
+export type TransactionWithRelations = Transaction & {
+  items: (TransactionItem & {
+    inventory: InventoryWithRelations;
+  })[];
+};
 
-export enum MeasurementUnit {
-  GRAM = 'GRAM',
-  KILOGRAM = 'KILOGRAM',
-  METER = 'METER',
-  YARD = 'YARD',
-}
+export type MaterialWithRelations = Material & {
+  inventory: InventoryWithRelations[];
+  products: (ProductMaterial & {
+    product: Product;
+  })[];
+};
 
-export enum OrderStatus {
-  PENDING = 'PENDING',
-  CONFIRMED = 'CONFIRMED',
-  SHIPPED = 'SHIPPED',
-  DELIVERED = 'DELIVERED',
-  CANCELLED = 'CANCELLED',
-}
-
-export interface MaterialOrderItem {
-  id: string;
-  orderId: string;
-  materialId: string;
-  quantity: number;
-  unit: MeasurementUnit;
-  unitPrice: number;
-  totalPrice: number;
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface MaterialOrder {
-  id: string;
-  orderNumber: string;
-  supplier: string;
-  orderItems: MaterialOrderItem[];
-  totalPrice: number;
-  currency: string;
-  orderDate: Date;
-  expectedDelivery: Date;
-  actualDelivery?: Date;
-  status: OrderStatus;
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-# app/types/product.ts
-
-```ts
-export interface Product {
-  id: string;
-  sku: string;
-  piece: string;
-  name: string;
-  season: string;
-  phase: 'SWATCH' | 'INITIAL_SAMPLE' | 'FIT_SAMPLE' | 'PRODUCTION_SAMPLE' | 'PRODUCTION';
-  notes?: string;
-  photos: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-# app/types/shared.ts
-
-```ts
+export type ProductWithRelations = Product & {
+  inventory: InventoryWithRelations[];
+  materials: (ProductMaterial & {
+    material: Material;
+  })[];
+};
 
 ```
 
@@ -5221,6 +7023,70 @@ CREATE UNIQUE INDEX "Contact_email_key" ON "Contact"("email");
 
 ```
 
+# prisma/migrations/20241122013502_init/migration.sql
+
+```sql
+/*
+  Warnings:
+
+  - You are about to drop the column `costPerUnit` on the `Material` table. All the data in the column will be lost.
+  - You are about to drop the column `location` on the `Material` table. All the data in the column will be lost.
+  - You are about to drop the column `photos` on the `Material` table. All the data in the column will be lost.
+  - You are about to drop the column `quantity` on the `Material` table. All the data in the column will be lost.
+  - You are about to drop the column `unit` on the `Material` table. All the data in the column will be lost.
+  - Added the required column `defaultCostPerUnit` to the `Material` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `defaultUnit` to the `Material` table without a default value. This is not possible if the table is not empty.
+
+*/
+-- CreateEnum
+CREATE TYPE "MovementType" AS ENUM ('RECEIVED', 'CONSUMED', 'ADJUSTED', 'RETURNED', 'SCRAPPED');
+
+-- AlterTable
+ALTER TABLE "Material" DROP COLUMN "costPerUnit",
+DROP COLUMN "location",
+DROP COLUMN "photos",
+DROP COLUMN "quantity",
+DROP COLUMN "unit",
+ADD COLUMN     "defaultCostPerUnit" DOUBLE PRECISION NOT NULL,
+ADD COLUMN     "defaultUnit" "MeasurementUnit" NOT NULL;
+
+-- CreateTable
+CREATE TABLE "MaterialInventory" (
+    "id" TEXT NOT NULL,
+    "materialId" TEXT NOT NULL,
+    "quantity" DOUBLE PRECISION NOT NULL,
+    "unit" "MeasurementUnit" NOT NULL,
+    "location" TEXT NOT NULL,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "MaterialInventory_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MaterialMovement" (
+    "id" TEXT NOT NULL,
+    "materialId" TEXT NOT NULL,
+    "quantity" DOUBLE PRECISION NOT NULL,
+    "unit" "MeasurementUnit" NOT NULL,
+    "type" "MovementType" NOT NULL,
+    "reference" TEXT,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "MaterialMovement_pkey" PRIMARY KEY ("id")
+);
+
+-- AddForeignKey
+ALTER TABLE "MaterialInventory" ADD CONSTRAINT "MaterialInventory_materialId_fkey" FOREIGN KEY ("materialId") REFERENCES "Material"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MaterialMovement" ADD CONSTRAINT "MaterialMovement_materialId_fkey" FOREIGN KEY ("materialId") REFERENCES "Material"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+```
+
 # prisma/migrations/migration_lock.toml
 
 ```toml
@@ -5241,6 +7107,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User management for application access control
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -5250,30 +7117,146 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+// Common inventory tracking for both materials and products
+// This unified model eliminates duplication between former MaterialInventory and ProductInventory
+// The type field (MATERIAL/PRODUCT) determines which foreign key (materialId/productId) is used
+model Inventory {
+  id        String          @id @default(cuid())
+  type      InventoryType   // Discriminator field to distinguish between material and product inventory
+  quantity  Float
+  unit      MeasurementUnit
+  location  String
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Semi-polymorphic relationship - only one of these will be set based on type
+  materialId String?
+  material   Material?      @relation(fields: [materialId], references: [id])
+  productId  String?
+  product    Product?       @relation(fields: [productId], references: [id])
+
+  // Each inventory record can have multiple transaction items (movements)
+  movements TransactionItem[]
+}
+
+// Common transaction model for tracking both material and product movements
+// Consolidates shared fields between former MaterialTransaction and ProductTransaction
+model Transaction {
+  id               String            @id @default(cuid())
+  type            InventoryType     // Matches the inventory type this transaction relates to
+  transactionType  TransactionType   // Tracks if items are coming in or going out
+  referenceNumber  String?          // External reference (PO number, invoice number, etc.)
+  supplier         String?          // Source for INCOMING transactions
+  recipient        String?          // Destination for OUTGOING transactions
+  items            TransactionItem[]
+  totalPrice       Float?
+  currency         String?
+  orderDate        DateTime
+  expectedDelivery DateTime?
+  actualDelivery   DateTime?
+  status           TransactionStatus
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+// Links transactions to specific inventory items
+// Records the quantity and pricing details of each item in a transaction
+model TransactionItem {
+  id           String       @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  inventoryId   String
+  inventory     Inventory   @relation(fields: [inventoryId], references: [id])
+  quantity      Float
+  unit          MeasurementUnit
+  unitPrice     Float?
+  totalPrice    Float?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+// Represents raw materials used in production
+// Examples: fabrics, buttons, zippers, thread
+model Material {
+  id                 String          @id @default(cuid())
+  type               String          // Category of material (e.g., "fabric", "button")
+  color              String
+  colorCode          String         // Reference color code for consistency
+  brand              String
+  defaultUnit        MeasurementUnit // Standard unit for measuring this material
+  defaultCostPerUnit Float           // Standard cost for purchasing calculations
+  currency           String
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  // Relations
+  inventory  Inventory[]        // Tracks stock levels across locations
+  products   ProductMaterial[]  // Links to products where this material is used
+}
+
+// Represents finished or in-progress products
+// Examples: shirts, dresses, accessories
+model Product {
+  id        String            @id @default(cuid())
+  sku       String            @unique  // Unique product identifier
+  piece     String            // Type of garment
+  name      String
+  season    String            // Collection/season identifier
+  phase     Phase             // Current development/production stage
+  photos    String[]          // Array of photo URLs
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  // Relations
+  materials ProductMaterial[] // Bill of materials - what goes into making this product
+  inventory Inventory[]       // Tracks stock levels across locations
+}
+
+// Associates materials with products
+// Acts as a bill of materials (BOM) for each product
+model ProductMaterial {
+  id         String          @id @default(cuid())
+  product    Product         @relation(fields: [productId], references: [id])
+  productId  String
+  material   Material        @relation(fields: [materialId], references: [id])
+  materialId String
+  quantity   Float           // How much of the material is needed for one product
+  unit       MeasurementUnit
+  notes      String?
+}
+
+// Stores information about external parties
+// Used for suppliers, manufacturers, customers
+model Contact {
+  id        String      @id @default(cuid())
+  name      String
+  email     String      @unique
+  phone     String?
+  company   String?
+  role      String?
+  type      ContactType // Categorizes the contact's relationship to the business
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+// Enums for standardizing choices across the application
+
+enum InventoryType {
+  MATERIAL  // Raw materials inventory
+  PRODUCT   // Finished goods inventory
+}
+
 enum Role {
   ADMIN
   USER
   PRODUCTION_MANAGER
   INVENTORY_MANAGER
-}
-
-model Material {
-  id                 String              @id @default(cuid())
-  type               String
-  color              String
-  colorCode          String
-  brand              String
-  quantity           Float
-  unit               MeasurementUnit
-  costPerUnit        Float
-  currency           String
-  location           String
-  notes              String?
-  photos             String[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  products           ProductMaterial[] // Changed from styleItems
-  materialOrderItems MaterialOrderItem[] // Added opposite relation field
 }
 
 enum MeasurementUnit {
@@ -5283,89 +7266,25 @@ enum MeasurementUnit {
   YARD
 }
 
-model Product {
-  id        String            @id @default(cuid())
-  sku       String            @unique
-  piece     String
-  name      String
-  season    String
-  phase     Phase
-  materials ProductMaterial[]
-  photos    String[]
-  notes     String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+enum TransactionType {
+  INCOMING  // Receiving inventory
+  OUTGOING  // Shipping/using inventory
 }
 
-model ProductMaterial {
-  id         String          @id @default(cuid())
-  product    Product         @relation(fields: [productId], references: [id])
-  productId  String
-  material   Material        @relation(fields: [materialId], references: [id])
-  materialId String
-  quantity   Float
-  unit       MeasurementUnit
-  notes      String?
+enum TransactionStatus {
+  PENDING    // Transaction created but not confirmed
+  CONFIRMED  // Transaction verified and approved
+  SHIPPED    // Items in transit
+  DELIVERED  // Items received at destination
+  CANCELLED  // Transaction voided
 }
 
-enum Phase {
-  SWATCH
-  INITIAL_SAMPLE
-  FIT_SAMPLE
-  PRODUCTION_SAMPLE
-  PRODUCTION
-}
-
-model MaterialOrder {
-  id               String              @id @default(cuid())
-  orderNumber      String              @unique
-  supplier         String
-  orderItems       MaterialOrderItem[]
-  totalPrice       Float
-  currency         String
-  orderDate        DateTime
-  expectedDelivery DateTime
-  actualDelivery   DateTime?
-  status           OrderStatus
-  notes            String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-}
-
-model MaterialOrderItem {
-  id         String          @id @default(cuid())
-  order      MaterialOrder   @relation(fields: [orderId], references: [id])
-  orderId    String
-  material   Material        @relation(fields: [materialId], references: [id])
-  materialId String
-  quantity   Float
-  unit       MeasurementUnit
-  unitPrice  Float
-  totalPrice Float
-  notes      String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  SHIPPED
-  DELIVERED
-  CANCELLED
-}
-
-model Contact {
-  id        String      @id @default(cuid())
-  name      String
-  email     String      @unique
-  phone     String?
-  company   String?
-  role      String?
-  type      ContactType
-  notes     String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+enum MovementType {
+  RECEIVED  // New inventory received
+  CONSUMED  // Used in production
+  ADJUSTED  // Inventory count corrections
+  RETURNED  // Sent back to supplier
+  SCRAPPED  // Damaged or unusable
 }
 
 enum ContactType {
@@ -5375,6 +7294,13 @@ enum ContactType {
   OTHER
 }
 
+enum Phase {
+  SWATCH             // Initial material selection
+  INITIAL_SAMPLE     // First prototype
+  FIT_SAMPLE        // Size/fit testing
+  PRODUCTION_SAMPLE // Final pre-production version
+  PRODUCTION        // Active manufacturing
+}
 ```
 
 # public/file.svg
@@ -5467,25 +7393,83 @@ debugDatabase().catch((e) => {
 # scripts/seed.ts
 
 ```ts
-// scripts/seed.ts
-import { PrismaClient } from "@prisma/client";
-import { ContactType } from "../app/types/contact";
-import { MeasurementUnit, OrderStatus } from "../app/types/materialOrder";
+import {
+  ContactType,
+  MeasurementUnit,
+  MovementType,
+  OrderStatus,
+  Phase,
+  PrismaClient,
+  Role,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// Sample data arrays
+const users = [
+  {
+    email: "admin@company.com",
+    name: "Admin User",
+    role: Role.ADMIN,
+  },
+  {
+    email: "production@company.com",
+    name: "Production Manager",
+    role: Role.PRODUCTION_MANAGER,
+  },
+  {
+    email: "inventory@company.com",
+    name: "Inventory Manager",
+    role: Role.INVENTORY_MANAGER,
+  },
+  {
+    email: "user@company.com",
+    name: "Regular User",
+    role: Role.USER,
+  },
+];
+
 const materials = [
-  { color: "Linen White", colorCode: "2071" },
-  { color: "Linen AAA", colorCode: "2571" },
-  { color: "Navy Blue", colorCode: "2108" },
-  { color: "Orange", colorCode: "2088" },
-  { color: "Pink", colorCode: "2102" },
-  { color: "Yellow", colorCode: "2091" },
-  { color: "Almond", colorCode: "2072" },
-  { color: "Black", colorCode: "2094" },
-  { color: "Cerulean Blue", colorCode: "2098" },
-  { color: "Dark Green", colorCode: "2095" },
-  { color: "Light Green", colorCode: "2083" },
+  {
+    type: "Cotton",
+    color: "Linen White",
+    colorCode: "2071",
+    brand: "Campolmi",
+    defaultUnit: MeasurementUnit.KILOGRAM,
+    defaultCostPerUnit: 25.0,
+    currency: "EUR",
+    notes: "30/2x4x4",
+  },
+  {
+    type: "Cotton",
+    color: "Navy Blue",
+    colorCode: "2108",
+    brand: "Campolmi",
+    defaultUnit: MeasurementUnit.KILOGRAM,
+    defaultCostPerUnit: 28.0,
+    currency: "EUR",
+    notes: "30/2x4x4",
+  },
+  {
+    type: "Cotton",
+    color: "Black",
+    colorCode: "2094",
+    brand: "Campolmi",
+    defaultUnit: MeasurementUnit.KILOGRAM,
+    defaultCostPerUnit: 26.0,
+    currency: "EUR",
+    notes: "30/2x4x4",
+  },
+  {
+    type: "Linen",
+    color: "Natural",
+    colorCode: "L001",
+    brand: "European Linen",
+    defaultUnit: MeasurementUnit.METER,
+    defaultCostPerUnit: 15.0,
+    currency: "EUR",
+    notes: "100% European Linen",
+  },
 ];
 
 const products = [
@@ -5493,51 +7477,25 @@ const products = [
     piece: "Scrunchie with Picot Trim",
     name: "Classic",
     sku: "SCRUNCH-PICOT-001",
+    season: "SS24",
+    phase: Phase.PRODUCTION,
+    notes: "Best seller",
   },
-  { piece: "Bracelet", name: "Classic", sku: "BRACE-CLASS-001" },
-  { piece: "Bandana", name: "Classic", sku: "BAND-CLASS-001" },
-  { piece: "Bucket Hat", name: "Classic", sku: "BUCKET-CLASS-001" },
-  { piece: "Wide Brim Sun Hat", name: "Classic", sku: "WBRIM-CLASS-001" },
-  { piece: "Wide Brim Sun Hat", name: "Stripes", sku: "WBRIM-STRIP-001" },
-  { piece: "Shell Sun Hat", name: "Classic", sku: "SHELL-CLASS-001" },
-  { piece: "Shell Sun Hat", name: "Stripes", sku: "SHELL-STRIP-001" },
   {
-    piece: "Scallop Edge Bucket Hat",
+    piece: "Bucket Hat",
     name: "Classic",
-    sku: "SCALBUCK-CLASS-001",
-  },
-];
-
-const materialOrders = [
-  {
-    orderNumber: "MO-2024-001",
-    supplier: "Campolmi Florence",
-    totalPrice: 2500.0,
-    currency: "EUR",
-    orderDate: new Date("2024-01-15"),
-    expectedDelivery: new Date("2024-02-15"),
-    status: OrderStatus.CONFIRMED,
-    notes: "Spring/Summer 2024 first order",
+    sku: "BUCKET-CLASS-001",
+    season: "SS24",
+    phase: Phase.PRODUCTION_SAMPLE,
+    notes: "New design",
   },
   {
-    orderNumber: "MO-2024-002",
-    supplier: "Campolmi Florence",
-    totalPrice: 1800.0,
-    currency: "EUR",
-    orderDate: new Date("2024-01-20"),
-    expectedDelivery: new Date("2024-02-20"),
-    status: OrderStatus.PENDING,
-    notes: "Additional materials for SS24",
-  },
-  {
-    orderNumber: "MO-2024-003",
-    supplier: "Campolmi Florence",
-    totalPrice: 3200.0,
-    currency: "EUR",
-    orderDate: new Date("2024-02-01"),
-    expectedDelivery: new Date("2024-03-01"),
-    status: OrderStatus.PENDING,
-    notes: "Pre-production materials order",
+    piece: "Wide Brim Sun Hat",
+    name: "Stripes",
+    sku: "WBRIM-STRIP-001",
+    season: "SS24",
+    phase: Phase.FIT_SAMPLE,
+    notes: "In development",
   },
 ];
 
@@ -5560,157 +7518,176 @@ const contacts = [
     type: ContactType.MANUFACTURER,
     notes: "Primary manufacturing contact",
   },
-  {
-    name: "David Lee",
-    email: "david.lee@customer.com",
-    phone: "+1 (555) 345-6789",
-    company: "Fashion Retail Group",
-    role: "Buyer",
-    type: ContactType.CUSTOMER,
-    notes: "Key wholesale customer",
-  },
 ];
 
 async function seed() {
   try {
-    // Clear existing data
-    await prisma.materialOrderItem.deleteMany();
-    await prisma.materialOrder.deleteMany();
-    await prisma.productMaterial.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.material.deleteMany();
-    await prisma.contact.deleteMany();
+    // Clear all existing data
+    await prisma.$transaction([
+      prisma.materialMovement.deleteMany(),
+      prisma.materialInventory.deleteMany(),
+      prisma.materialOrderItem.deleteMany(),
+      prisma.materialOrder.deleteMany(),
+      prisma.productMaterial.deleteMany(),
+      prisma.product.deleteMany(),
+      prisma.material.deleteMany(),
+      prisma.contact.deleteMany(),
+      prisma.user.deleteMany(),
+    ]);
 
     console.log("Cleared existing data");
 
-    // Add materials
+    // Create users
+    const createdUsers = await Promise.all(
+      users.map((user) =>
+        prisma.user.create({
+          data: user,
+        })
+      )
+    );
+    console.log(`Created ${createdUsers.length} users`);
+
+    // Create materials
     const createdMaterials = await Promise.all(
-      materials.map((material) =>
-        prisma.material.create({
+      materials.map(async (material) => {
+        const createdMaterial = await prisma.material.create({
+          data: material,
+        });
+
+        // Create inventory entry for each material
+        await prisma.materialInventory.create({
           data: {
-            type: "Cotton",
-            color: material.color,
-            colorCode: material.colorCode,
-            brand: "Campolmi",
-            quantity: 0.0,
-            unit: MeasurementUnit.KILOGRAM,
-            costPerUnit: 0.0,
-            currency: "EUR",
-            location: "Warehouse",
-            notes: "30/2x4x4",
-            photos: [],
+            materialId: createdMaterial.id,
+            quantity: Math.floor(Math.random() * 100),
+            unit: material.defaultUnit,
+            location: "Main Warehouse",
+            notes: "Initial stock",
           },
-        })
-      )
+        });
+
+        // Create some random movements for each material
+        const movementTypes = [
+          MovementType.RECEIVED,
+          MovementType.CONSUMED,
+          MovementType.ADJUSTED,
+        ];
+        for (let i = 0; i < 3; i++) {
+          await prisma.materialMovement.create({
+            data: {
+              materialId: createdMaterial.id,
+              quantity: Math.floor(Math.random() * 50),
+              unit: material.defaultUnit,
+              type: movementTypes[i],
+              reference: `REF-${Date.now()}-${i}`,
+              notes: `Sample ${movementTypes[i]} movement`,
+            },
+          });
+        }
+
+        return createdMaterial;
+      })
+    );
+    console.log(
+      `Created ${createdMaterials.length} materials with inventory and movements`
     );
 
-    console.log(`Added ${createdMaterials.length} materials`);
-
-    // Add products
+    // Create products
     const createdProducts = await Promise.all(
-      products.map((product) =>
-        prisma.product.create({
+      products.map(async (product) => {
+        const createdProduct = await prisma.product.create({
+          data: product,
+        });
+
+        // Create product-material relationships
+        await prisma.productMaterial.create({
           data: {
-            sku: product.sku,
-            piece: product.piece,
-            name: product.name,
-            season: "SS24",
-            phase: "SWATCH",
-            notes: `Initial creation of ${product.piece} - ${product.name}`,
-            photos: [],
+            productId: createdProduct.id,
+            materialId:
+              createdMaterials[
+                Math.floor(Math.random() * createdMaterials.length)
+              ].id,
+            quantity: Math.random() * 5,
+            unit: MeasurementUnit.METER,
+            notes: "Primary material",
           },
-        })
-      )
+        });
+
+        return createdProduct;
+      })
+    );
+    console.log(
+      `Created ${createdProducts.length} products with material relationships`
     );
 
-    console.log(`Added ${createdProducts.length} products`);
+    // Create material orders
+    const orders = [];
+    for (let i = 1; i <= 3; i++) {
+      const order = await prisma.materialOrder.create({
+        data: {
+          orderNumber: `MO-2024-00${i}`,
+          supplier: "Campolmi Florence",
+          totalPrice: Math.floor(Math.random() * 5000) + 1000,
+          currency: "EUR",
+          orderDate: new Date(2024, 0, i * 5),
+          expectedDelivery: new Date(2024, 1, i * 5),
+          actualDelivery: i === 1 ? new Date(2024, 1, i * 5) : null,
+          status:
+            i === 1
+              ? OrderStatus.DELIVERED
+              : i === 2
+              ? OrderStatus.CONFIRMED
+              : OrderStatus.PENDING,
+          notes: `Order ${i} notes`,
+        },
+      });
 
-    // Add material orders
-    const createdOrders = await Promise.all(
-      materialOrders.map((order) =>
-        prisma.materialOrder.create({
-          data: {
-            orderNumber: order.orderNumber,
-            supplier: order.supplier,
-            totalPrice: order.totalPrice,
-            currency: order.currency,
-            orderDate: order.orderDate,
-            expectedDelivery: order.expectedDelivery,
-            status: order.status,
-            notes: order.notes,
-          },
-        })
-      )
-    );
-
-    console.log(`Added ${createdOrders.length} material orders`);
-
-    // Add contacts
-    const createdContacts = await Promise.all(
-      contacts.map((contact) =>
-        prisma.contact.create({
-          data: {
-            name: contact.name,
-            email: contact.email,
-            phone: contact.phone,
-            company: contact.company,
-            role: contact.role,
-            type: contact.type,
-            notes: contact.notes,
-          },
-        })
-      )
-    );
-
-    console.log(`Added ${createdContacts.length} contacts`);
-
-    // Add material order items
-    // Create some sample order items for each order
-    for (const order of createdOrders) {
-      // Add 2-3 items per order with different materials
-      const numItems = Math.floor(Math.random() * 2) + 2; // 2-3 items
-      for (let i = 0; i < numItems; i++) {
+      // Create 2-3 order items for each order
+      const numItems = Math.floor(Math.random() * 2) + 2;
+      for (let j = 0; j < numItems; j++) {
         const material =
           createdMaterials[Math.floor(Math.random() * createdMaterials.length)];
-        const quantity = Math.floor(Math.random() * 50) + 10; // 10-60 units
-        const unitPrice = Math.random() * 20 + 10; // 10-30 per unit
+        const quantity = Math.floor(Math.random() * 50) + 10;
 
         await prisma.materialOrderItem.create({
           data: {
             orderId: order.id,
             materialId: material.id,
             quantity: quantity,
-            unit: MeasurementUnit.KILOGRAM,
-            unitPrice: unitPrice,
-            totalPrice: quantity * unitPrice,
+            unit: material.defaultUnit,
+            unitPrice: material.defaultCostPerUnit,
+            totalPrice: quantity * material.defaultCostPerUnit,
             notes: `Order item for ${material.color}`,
           },
         });
       }
+
+      orders.push(order);
     }
+    console.log(`Created ${orders.length} orders with items`);
 
-    console.log("Added material order items");
-
-    // Create some product-material relationships
-    await prisma.productMaterial.create({
-      data: {
-        productId: createdProducts[0].id,
-        materialId: createdMaterials[0].id,
-        quantity: 1.0,
-        unit: MeasurementUnit.KILOGRAM,
-        notes: "Main material",
-      },
-    });
+    // Create contacts
+    const createdContacts = await Promise.all(
+      contacts.map((contact) =>
+        prisma.contact.create({
+          data: contact,
+        })
+      )
+    );
+    console.log(`Created ${createdContacts.length} contacts`);
 
     console.log("Seeding completed successfully");
   } catch (error) {
     console.error("Error seeding data:", error);
+    throw error;
   } finally {
     await prisma.$disconnect();
   }
 }
 
-seed();
+seed().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
 
 ```
 

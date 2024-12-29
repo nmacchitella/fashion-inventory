@@ -5,7 +5,7 @@ export default function InventoryPage() {
   const inventories = [
     {
       title: "Materials",
-      description: "Track and manage material orders and their status",
+      description: "Track our current material inventory.",
       href: "/inventory/materials",
       icon: "📦", // We can replace this with a proper icon
       stats: {
@@ -15,7 +15,7 @@ export default function InventoryPage() {
     },
     {
       title: "Products",
-      description: "Track and manage material orders and their status",
+      description: "Track our current product inventory.",
       href: "/inventory/products",
       icon: "📦", // We can replace this with a proper icon
       stats: {

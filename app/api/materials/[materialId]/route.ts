@@ -1,24 +1,34 @@
+// app/api/materials/[materialId]/route.ts
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+//
+// GET /api/materials/[materialId]
+//
 export async function GET(
-  _request: Request,
-  { params }: { params: { materialId: string } }
+  request: Request,
+  context: { params: { materialId: string } }
 ) {
   try {
+    // Destructure materialId from context.params
+    const { materialId } = context.params;
+
+    // No request.json() for GET — remove that part entirely
+    console.log("GET request for material:", materialId);
+
     const material = await prisma.material.findUnique({
       where: {
-        id: params.materialId,
+        id: materialId,
       },
       include: {
+        inventory: {
+          include: {
+            movements: true,
+          },
+        },
         products: {
           include: {
             product: true,
-          },
-        },
-        materialOrderItems: {
-          include: {
-            order: true,
           },
         },
       },
@@ -33,7 +43,7 @@ export async function GET(
 
     return NextResponse.json(material);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error fetching material:", error);
     return NextResponse.json(
       { error: "Error fetching material" },
       { status: 500 }
@@ -46,125 +56,176 @@ export async function PATCH(
   { params }: { params: { materialId: string } }
 ) {
   try {
+    // 1. Await the request body
     const json = await request.json();
 
-    const material = await prisma.material.update({
-      where: {
-        id: params.materialId,
-      },
-      data: {
-        type: json.type,
-        color: json.color,
-        colorCode: json.colorCode,
-        brand: json.brand,
-        quantity: parseFloat(json.quantity),
-        unit: json.unit,
-        costPerUnit: parseFloat(json.costPerUnit),
-        currency: json.currency,
-        location: json.location,
-        notes: json.notes || null,
-      },
-      include: {
-        products: {
-          include: {
-            product: true,
-          },
-        },
-        materialOrderItems: {
-          include: {
-            order: true,
-          },
-        },
-      },
+    // 2. Validate the payload
+    if (!json) {
+      return NextResponse.json(
+        { error: "Request body is required" },
+        { status: 400 }
+      );
+    }
+
+    console.log("Received data:", json);
+
+    // 3. Get and validate materialId
+    const { materialId } = params;
+    if (!materialId) {
+      return NextResponse.json(
+        { error: "Material ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // 4. Ensure the material exists first
+    const existingMaterial = await prisma.material.findUnique({
+      where: { id: materialId },
     });
 
-    return NextResponse.json(material);
+    if (!existingMaterial) {
+      return NextResponse.json(
+        { error: "Material not found" },
+        { status: 404 }
+      );
+    }
+
+    console.log(json);
+
+    // Update material using transaction to ensure data consistency
+    const updatedMaterial = await prisma.$transaction(async (tx) => {
+      const material = await tx.material.update({
+        where: { id: materialId },
+        data: {
+          // Spread the json but explicitly remove relations to prevent unintended updates
+          ...json,
+          inventory: undefined,
+          products: undefined,
+          // Convert string values to numbers where needed
+          defaultCostPerUnit: json.defaultCostPerUnit
+            ? parseFloat(json.defaultCostPerUnit)
+            : undefined,
+        },
+        include: {
+          inventory: {
+            include: {
+              movements: true,
+            },
+          },
+          products: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+      console.log("done");
+      return material;
+    });
+
+    console.log("completing here");
+
+    return NextResponse.json(updatedMaterial);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error updating material:", error);
     return NextResponse.json(
-      { error: "Error updating material" },
+      {
+        error: "Error updating material",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: Request,
-  context: { params: Promise<{ materialId: string }> }
+  _request: Request,
+  { params }: { params: { materialId: string } }
 ) {
   try {
-    console.log("----1");
-    // Await the params
-    const { materialId } = await context.params;
-    console.log("----2");
+    const materialId = params.materialId;
 
-    if (!materialId) {
-      return NextResponse.json(
-        { message: "Material ID is required" },
-        { status: 400 }
-      );
-    }
-    console.log("----3");
-    // Check if material exists
-    const existingMaterial = await prisma.material.findUnique({
+    console.log("Attempting to delete material:", materialId);
+
+    // Check if material exists with all relevant relations
+    const material = await prisma.material.findUnique({
       where: { id: materialId },
       include: {
-        _count: {
-          select: {
-            products: true,
-            materialOrderItems: true,
+        inventory: {
+          include: {
+            movements: true,
           },
         },
+        products: true,
       },
     });
 
-    console.log("----4");
-
-    if (!existingMaterial) {
+    if (!material) {
+      console.log("Material not found:", materialId);
       return NextResponse.json(
-        { message: "Material not found" },
+        { error: "Material not found" },
         { status: 404 }
       );
     }
-    console.log("----5");
-    // Check if material is used in any products or orders
-    if (
-      existingMaterial._count.products > 0 ||
-      existingMaterial._count.materialOrderItems > 0
-    ) {
-      return new NextResponse(
-        JSON.stringify({
-          message: "Cannot delete material because it is in use",
-          details: {
-            productsCount: existingMaterial._count.products,
-            ordersCount: existingMaterial._count.materialOrderItems,
-          },
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+
+    // Check if material has any inventory or product relationships
+    if (material.inventory.length > 0 || material.products.length > 0) {
+      // Check if any inventory has movements
+      const hasMovements = material.inventory.some(
+        (inv) => inv.movements.length > 0
+      );
+
+      if (hasMovements) {
+        return NextResponse.json(
+          { error: "Cannot delete material with existing inventory movements" },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete material that is in use by products or has existing inventory",
+        },
+        { status: 400 }
       );
     }
-    console.log("----6");
 
-    // Delete the material
-    await prisma.material.delete({
-      where: {
-        id: materialId,
-      },
+    // Use transaction to ensure all related records are deleted properly
+    await prisma.$transaction(async (tx) => {
+      // Delete all inventory records
+      await tx.inventory.deleteMany({
+        where: {
+          materialId: materialId,
+        },
+      });
+
+      // Delete all product-material relationships
+      await tx.productMaterial.deleteMany({
+        where: {
+          materialId: materialId,
+        },
+      });
+
+      // Finally delete the material
+      await tx.material.delete({
+        where: {
+          id: materialId,
+        },
+      });
     });
 
-    return NextResponse.json(
-      {
-        message: "Material deleted successfully",
-        deletedId: materialId,
-      },
-      { status: 200 }
-    );
+    console.log("Material and related records deleted successfully");
+    return NextResponse.json({
+      message: "Material deleted successfully",
+      id: materialId,
+    });
   } catch (error) {
-    console.error("Error in DELETE API:", error);
+    console.error("Error during material deletion:", error);
     return NextResponse.json(
       {
-        message: "Failed to delete material",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Error deleting material",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );

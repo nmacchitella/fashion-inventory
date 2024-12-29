@@ -1,0 +1,696 @@
+[
+  {
+    "name": "Scrunchie with Picot Trim",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 30,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCR-PCT-2071-S25"
+  },
+  {
+    "name": "Scrunchie with Picot Trim",
+    "materials": [
+      {
+        "code": "2094",
+        "quantity": 30,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCR-PCT-2094-S25"
+  },
+  {
+    "name": "Scrunchie with Picot Trim",
+    "materials": [
+      {
+        "code": "2102",
+        "quantity": 30,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCR-PCT-2102-S25"
+  },
+  {
+    "name": "Bracelet",
+    "materials": [
+      {
+        "code": "2088",
+        "quantity": 30,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BRC-2088-S25"
+  },
+  {
+    "name": "Bracelet",
+    "materials": [
+      {
+        "code": "2094",
+        "quantity": 30,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BRC-2094-S25"
+  },
+  {
+    "name": "Bracelet",
+    "materials": [
+      {
+        "code": "2102",
+        "quantity": 30,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BRC-2102-S25"
+  },
+  {
+    "name": "Scrunchie with Picot Trim",
+    "materials": [
+      {
+        "code": "2083",
+        "quantity": 10,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2102",
+        "quantity": 30,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCR-PCT-2083-2102-S25"
+  },
+  {
+    "name": "Scrunchie with Picot Trim",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 40,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCR-PCT-2071-40-S25"
+  },
+  {
+    "name": "Scrunchie with Picot Trim",
+    "materials": [
+      {
+        "code": "2094",
+        "quantity": 40,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCR-PCT-2094-40-S25"
+  },
+  {
+    "name": "Bandana",
+    "materials": [
+      {
+        "code": "2083",
+        "quantity": 60,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2108",
+        "quantity": 15,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BND-2083-2108-S25"
+  },
+  {
+    "name": "Bandana",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 60,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2091",
+        "quantity": 15,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BND-2071-2091-S25"
+  },
+  {
+    "name": "Bandana",
+    "materials": [
+      {
+        "code": "2095",
+        "quantity": 15,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2102",
+        "quantity": 60,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BND-2095-2102-S25"
+  },
+  {
+    "name": "Bandana",
+    "materials": [
+      {
+        "code": "2072",
+        "quantity": 15,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2098",
+        "quantity": 60,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BND-2072-2098-S25"
+  },
+  {
+    "name": "Bucket Hat",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 140,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2098",
+        "quantity": 15,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BKT-HAT-2071-2098-S25"
+  },
+  {
+    "name": "Bucket Hat",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 20,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2091",
+        "quantity": 120,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BKT-HAT-2071-2091-S25"
+  },
+  {
+    "name": "Bucket Hat",
+    "materials": [
+      {
+        "code": "2088",
+        "quantity": 20,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2102",
+        "quantity": 120,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BKT-HAT-2088-2102-S25"
+  },
+  {
+    "name": "Bucket Hat",
+    "materials": [
+      {
+        "code": "2095",
+        "quantity": 120,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2102",
+        "quantity": 20,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BKT-HAT-2095-2102-S25"
+  },
+  {
+    "name": "Bucket Hat",
+    "materials": [
+      {
+        "code": "2083",
+        "quantity": 110,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2108",
+        "quantity": 40,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BKT-HAT-2083-2108-S25"
+  },
+  {
+    "name": "Bucket Hat",
+    "materials": [
+      {
+        "code": "2098",
+        "quantity": 110,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2108",
+        "quantity": 40,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BKT-HAT-2098-2108-S25"
+  },
+  {
+    "name": "Bucket Hat",
+    "materials": [
+      {
+        "code": "2088",
+        "quantity": 40,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2102",
+        "quantity": 110,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "BKT-HAT-2088-2102-40-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat",
+    "materials": [
+      {
+        "code": "2091",
+        "quantity": 190,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-2091-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 180,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2094",
+        "quantity": 20,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-2071-2094-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat - Stripes",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 95,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2091",
+        "quantity": 115,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-STR-2071-2091-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat - Stripes",
+    "materials": [
+      {
+        "code": "2098",
+        "quantity": 95,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2108",
+        "quantity": 115,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-STR-2098-2108-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat - Stripes",
+    "materials": [
+      {
+        "code": "2095",
+        "quantity": 115,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2102",
+        "quantity": 95,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-STR-2095-2102-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 20,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2091",
+        "quantity": 180,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-2071-2091-20-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat",
+    "materials": [
+      {
+        "code": "2072",
+        "quantity": 180,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2083",
+        "quantity": 20,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-2072-2083-S25"
+  },
+  {
+    "name": "Wide Brim Sun Hat - Stripes",
+    "materials": [
+      {
+        "code": "2072",
+        "quantity": 95,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2083",
+        "quantity": 115,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "WB-SUN-HAT-STR-2072-2083-S25"
+  },
+  {
+    "name": "Shell Sun Hat",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 160,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SHL-SUN-HAT-2071-S25"
+  },
+  {
+    "name": "Shell Sun Hat - Stripes",
+    "materials": [
+      {
+        "code": "2072",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2098",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SHL-SUN-HAT-STR-2072-2098-S25"
+  },
+  {
+    "name": "Shell Sun Hat - Stripes",
+    "materials": [
+      {
+        "code": "2095",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2102",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SHL-SUN-HAT-STR-2095-2102-S25"
+  },
+  {
+    "name": "Shell Sun Hat - Stripes",
+    "materials": [
+      {
+        "code": "2083",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2108",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SHL-SUN-HAT-STR-2083-2108-S25"
+  },
+  {
+    "name": "Scallop Edge Bucket Hat",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 160,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCLP-BKT-HAT-2071-S25"
+  },
+  {
+    "name": "Scallop Edge Bucket Hat",
+    "materials": [
+      {
+        "code": "2091",
+        "quantity": 160,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCLP-BKT-HAT-2091-S25"
+  },
+  {
+    "name": "Scallop Edge Bucket Hat",
+    "materials": [
+      {
+        "code": "2072",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2098",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCLP-BKT-HAT-2072-2098-S25"
+  },
+  {
+    "name": "Scallop Edge Bucket Hat",
+    "materials": [
+      {
+        "code": "2083",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      },
+      {
+        "code": "2108",
+        "quantity": 80,
+        "thread": "30/2x4x4"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "SCLP-BKT-HAT-2083-2108-S25"
+  },
+  {
+    "name": "Mini Skirt - Solid",
+    "materials": [
+      {
+        "code": "2091",
+        "quantity": 380,
+        "thread": "30/2x5x2"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "MINI-SKT-SLD-2091-S25"
+  },
+  {
+    "name": "Mini Skirt - Solid",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 380,
+        "thread": "30/2x5x2"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "MINI-SKT-SLD-2071-S25"
+  },
+  {
+    "name": "Mini Skirt - Solid",
+    "materials": [
+      {
+        "code": "2102",
+        "quantity": 380,
+        "thread": "30/2x5x2"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "MINI-SKT-SLD-2102-S25"
+  },
+  {
+    "name": "Mini Skirt - Solid",
+    "materials": [
+      {
+        "code": "2083",
+        "quantity": 200,
+        "thread": "30/2x5x2"
+      },
+      {
+        "code": "2108",
+        "quantity": 200,
+        "thread": "30/2x5x2"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "MINI-SKT-SLD-2083-2108-S25"
+  },
+  {
+    "name": "Dress - Solid (xs,s,m,l)",
+    "materials": [
+      {
+        "code": "2071",
+        "quantity": 700,
+        "thread": "30/2x5x2"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "DRESS-SLD-2071-S25"
+  },
+  {
+    "name": "Dress - Stripe (xs,s,m,l)",
+    "materials": [
+      {
+        "code": "2095",
+        "quantity": 350,
+        "thread": "30/2x5x2"
+      },
+      {
+        "code": "2102",
+        "quantity": 350,
+        "thread": "30/2x5x2"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "DRESS-STR-2095-2102-S25"
+  },
+  {
+    "name": "Dress - Stripe (xs,s,m,l)",
+    "materials": [
+      {
+        "code": "2083",
+        "quantity": 350,
+        "thread": "30/2x5x2"
+      },
+      {
+        "code": "2108",
+        "quantity": 350,
+        "thread": "30/2x5x2"
+      }
+    ],
+    "season": "Summer 2025",
+    "phase": "PRODUCTION_SAMPLE",
+    "SKU": "DRESS-STR-2083-2108-S25"
+  }
+]
