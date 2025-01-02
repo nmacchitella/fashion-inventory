@@ -45,7 +45,7 @@ export async function seedProducts() {
                       { colorCode: material.code },
                       {
                         properties: {
-                          path: ["thread"],
+                          path: ["thread", "value"],
                           equals: material.thread,
                         },
                       },

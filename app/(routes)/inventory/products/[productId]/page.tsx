@@ -1,35 +1,106 @@
 "use client";
 
 import { DataTable, type DataTableColumn } from "@/components/data-table";
+import MaterialSelector from "@/components/forms/product-material-selector";
 import { UpsertDialog } from "@/components/forms/upsert-dialog"; // or your renamed component
 import { Notes } from "@/components/notes";
-import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
 import { Inventory, Product } from "@/types/types";
+import { Plus } from "lucide-react";
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 // Example of the same product form fields you used in ProductsControls:
-const productFields = [
-  { key: "sku", label: "SKU", type: "text", required: true },
-  { key: "piece", label: "Piece", type: "text", required: true },
-  { key: "name", label: "Name", type: "text", required: true },
-  { key: "season", label: "Season", type: "text" },
+export const inventoryFields = [
   {
-    key: "phase",
-    label: "Phase",
-    type: "select",
-    options: [
-      "SWATCH",
-      "INITIAL_SAMPLE",
-      "FIT_SAMPLE",
-      "PRODUCTION_SAMPLE",
-      "PRODUCTION",
-    ],
+    key: "quantity",
+    label: "Quantity",
+    type: "number",
     required: true,
   },
-  { key: "notes", label: "Notes", type: "textarea" },
+  {
+    key: "unit",
+    label: "Unit",
+    type: "select",
+    options: [{ label: "Unit", value: "UNIT" }],
+    required: true,
+  },
+  {
+    key: "location",
+    label: "Location",
+    type: "text",
+  },
+  {
+    key: "notes",
+    label: "Notes",
+    type: "textarea",
+  },
+  // Optionally, if you're providing productId via form (often it’s just included in the request automatically):
+  // {
+  //   key: "productId",
+  //   label: "Product ID",
+  //   type: "hidden",
+  //   defaultValue: someProductId,
+  // },
+];
+
+export const materialFields = [
+  {
+    key: "type",
+    label: "Material Type",
+    type: "text", // or 'select' if you have predefined categories
+    required: true,
+  },
+  {
+    key: "color",
+    label: "Color",
+    type: "text",
+  },
+  {
+    key: "colorCode",
+    label: "Color Code",
+    type: "text",
+  },
+  {
+    key: "brand",
+    label: "Brand",
+    type: "text",
+  },
+  {
+    key: "defaultUnit",
+    label: "Default Unit",
+    type: "select",
+    options: [
+      { label: "Gram", value: "GRAM" },
+      { label: "Kilogram", value: "KILOGRAM" },
+      { label: "Meter", value: "METER" },
+      { label: "Yard", value: "YARD" },
+      { label: "Unit", value: "UNIT" },
+    ],
+  },
+  {
+    key: "defaultCostPerUnit",
+    label: "Cost per Unit",
+    type: "number",
+  },
+  {
+    key: "currency",
+    label: "Currency",
+    type: "text",
+    // Or use a dropdown of known currencies, e.g. 'USD', 'EUR', etc.
+  },
+  {
+    key: "properties",
+    label: "Properties (JSON)",
+    type: "textarea",
+    // If you want a friendlier UI, you might implement a structured editor
+  },
+  {
+    key: "notes",
+    label: "Notes",
+    type: "textarea",
+  },
 ];
 
 async function fetchProduct(productId: string) {
@@ -56,9 +127,18 @@ export default function ProductPage({
   // In Next 13+ (app router), we "resolve" the promise from `params`:
   const resolvedParams = use(params);
   const [product, setProduct] = useState<Product | null>(null);
+  const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(
+    null
+  );
 
   // Whether we show the edit dialog
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [dialogState, setDialogState] = useState<{
+    open: boolean;
+    item?: "Inventory" | "Material";
+    mode?: "create" | "edit";
+  }>({ open: false });
+
+  const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
 
   // Load the product data on mount or when productId changes
   useEffect(() => {
@@ -90,42 +170,15 @@ export default function ProductPage({
 
   // Items for our DetailsView
   const detailItems = [
-    { label: "SKU", value: product.sku },
-    { label: "Piece", value: product.piece },
-    { label: "Name", value: product.name },
-    { label: "Season", value: product.season },
+    { label: "SKU", value: product.sku, key: "sku", editable: true },
+    { label: "Piece", value: product.piece, key: "piece", editable: true },
+    { label: "Name", value: product.name, key: "name", editable: true },
+    { label: "Season", value: product.season, key: "season", editable: true },
     {
       label: "Phase",
-      value: (
-        <span
-          className={`px-2 py-1 rounded-full text-sm ${getPhaseColor(
-            product.phase
-          )}`}
-        >
-          {product.phase}
-        </span>
-      ),
-    },
-    {
-      label: "Materials",
-      value: (
-        <div className="space-y-2">
-          {product.materials?.map((pm) => (
-            <div key={pm.id} className="flex items-center gap-2">
-              <div
-                className="w-4 h-4 rounded-full border"
-                style={{ backgroundColor: pm.material.colorCode }}
-              />
-              <span>
-                {pm.material.type} - {pm.material.color}
-              </span>
-              <span className="text-gray-500">
-                ({pm.quantity} {pm.unit})
-              </span>
-            </div>
-          ))}
-        </div>
-      ),
+      value: product.phase,
+      key: "phase",
+      editable: true,
     },
   ];
 
@@ -138,14 +191,69 @@ export default function ProductPage({
     { header: "Location", accessorKey: "location" },
   ];
 
+  const materialColumns: DataTableColumn<Inventory>[] = [
+    {
+      header: "Brand",
+      accessorKey: "brand",
+      cell: (material) => `${material?.material.brand}`,
+    },
+    {
+      header: "Type",
+      accessorKey: "type",
+      cell: (material) => `${material?.material.type}`,
+    },
+    {
+      header: "Color",
+      accessorKey: "color",
+      cell: (material) =>
+        `${material?.material.colorCode} ${material?.material.color}`,
+    },
+    {
+      header: "Quantity",
+      accessorKey: "quantity",
+      cell: (material) => `${material?.quantity} ${material?.unit}`,
+    },
+  ];
+
   // -- Updating product via PATCH
   const handleSaveSuccess = async (updated: Product) => {
     // Merge new data into state
     setProduct(updated);
     // Close dialog
-    setIsEditDialogOpen(false);
+    setDialogState({ open: false });
   };
 
+  const handleSaveInventorySuccess = (newInventory: Inventory) => {
+    if (!product) return;
+
+    const updatedInventory = product.inventory.find(
+      (i) => i.id === newInventory.id
+    )
+      ? product.inventory.map((i) =>
+          i.id === newInventory.id ? newInventory : i
+        )
+      : [...product.inventory, newInventory];
+
+    setProduct({
+      ...product,
+      inventory: updatedInventory,
+    });
+    setDialogState({ open: false });
+  };
+
+  const handleAddMaterial = () => {
+    setDialogState({ open: true, item: "Material", mode: "create" });
+  };
+
+  const handleAddInventory = () => {
+    setDialogState({ open: true, item: "Inventory", mode: "create" });
+  };
+
+  const handleEditInventory = (inventory: Inventory) => {
+    setDialogState({ open: true, item: "Inventory", mode: "edit" });
+    setSelectedInventory(inventory);
+    return;
+  };
   // -- Deleting the product
   const handleDelete = async (id: string) => {
     try {
@@ -164,22 +272,79 @@ export default function ProductPage({
     }
   };
 
+  // E.g. a little helper that returns the correct props for each mode:
+  function getDialogProps(item: string | undefined) {
+    switch (item) {
+      // case "Product":
+      //   return {
+      //     title: "Product",
+      //     // If you’re using UpsertDialog:
+      //     fields: productFields,
+      //     defaultData: product,
+      //     apiEndpoint: "/api/products",
+      //     itemName: "Product",
+      //     method: "PATCH",
+      //   };
+      case "Material":
+        return {
+          title: "Material",
+          fields: materialFields,
+          defaultData: {}, // or something
+          apiEndpoint: "/api/materials",
+          itemName: "Material",
+          method: "POST",
+        };
+      case "Inventory":
+        return {
+          title: "Inventory",
+          fields: inventoryFields,
+          defaultData: {
+            ...selectedInventory,
+            unit: "UNIT",
+            type: "PRODUCT",
+            productId: product.id,
+          },
+          apiEndpoint: "/api/inventory",
+          itemName: "Inventory",
+          method: "POST",
+          onSuccess: handleSaveInventorySuccess,
+        };
+      default:
+        return {
+          title: "",
+          fields: [],
+          defaultData: {},
+          apiEndpoint: "",
+          itemName: "",
+          method: "POST",
+        };
+    }
+  }
+
+  const handleMaterialSelect = async (data) => {
+    await fetch(`/api/products/${product.id}/materials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    // Refresh product data
+    fetchProduct(product.id).then(setProduct);
+  };
+
   return (
     <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">${product.name}</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsEditDialogOpen(true)}
-              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
-            >
-              Edit
-            </button>
-            <BackButton />
-          </div>
+          <h1 className="text-2xl font-bold"></h1>
         </div>
-        <DetailsView title="" items={detailItems} />
+        <DetailsView
+          title={product.name}
+          onSave={handleSaveSuccess}
+          items={detailItems}
+          apiEndpoint="/api/products"
+          itemId={product.id}
+          allowCustomFields={false} // Enable custom fields for materials
+        />
       </div>
       <div className="mt-2">
         <Notes
@@ -192,47 +357,70 @@ export default function ProductPage({
 
       <div className="mt-6 flex flex-col gap-6">
         <div className="">
-          <h2 className="text-1xl mb-2 font-bold">Inventory</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-1xl font-bold">Materials Needed</h2>
+            <button
+              className="p-1 hover:bg-gray-100 rounded-full"
+              title="Add new material"
+              onClick={() => setMaterialDialogOpen(true)}
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+            {materialDialogOpen && (
+              <MaterialSelector
+                productId={product.id}
+                onSelect={handleMaterialSelect}
+                open={materialDialogOpen}
+                onOpenChange={setMaterialDialogOpen}
+                fields={materialFields}
+              />
+            )}
+          </div>
+
+          <DataTable
+            data={product.materials}
+            columns={materialColumns}
+            viewPath="/inventory"
+          />
+        </div>
+        <div className="">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-1xl font-bold">Inventory</h2>
+            <button
+              className="p-1 hover:bg-gray-100 rounded-full"
+              title="Add new inventory item"
+              onClick={handleAddInventory}
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+
           <DataTable
             data={product.inventory}
             columns={inventoryColumns}
-            viewPath="/inventory" // Assuming the details path for inventory items
+            viewPath="/inventory"
+            onUpdate={handleEditInventory}
           />
         </div>
-        {/* <div className="">
-          <h2 className="text-1xl mb-2 font-bold">Products</h2>
-          <DataTable
-            data={material.products}
-            columns={productsColumns}
-            viewPath="/inventory" // Assuming the details path for inventory items
-          />
-        </div> */}
       </div>
 
       {/* Edit dialog: reuse UpsertDialog (or your custom product dialog) */}
-      {isEditDialogOpen && (
+      {dialogState.open && (
         <DialogComponent
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          title="Edit Product"
+          open={dialogState.open}
+          onOpenChange={setDialogState}
+          title={getDialogProps(dialogState.item).title}
         >
           <UpsertDialog
             // Tell it we’re editing, not creating
-            mode="edit"
-            open={isEditDialogOpen}
-            onOpenChange={setIsEditDialogOpen}
-            onSuccess={handleSaveSuccess}
-            // Provide the existing product as default data
-            defaultData={product}
-            fields={productFields}
-            apiEndpoint="/api/products"
-            itemName="Product"
-            // We'll do PATCH instead of PUT inside UpsertDialog:
-            // Make sure your UpsertDialog or EditForm uses method="PATCH" if mode="edit"
-            // Or you can pass in a "method" prop if you like.
-            //
-            // For deleting inside the same form, we can pass an onDeleteSuccess too:
+            mode={dialogState.mode}
+            open={dialogState.open}
+            onOpenChange={(isOpen) =>
+              setDialogState((prev) => ({ ...prev, open: isOpen }))
+            }
+            // onSuccess={handleSaveSuccess}
             onDeleteSuccess={handleDelete}
+            {...getDialogProps(dialogState.item)}
           />
         </DialogComponent>
       )}

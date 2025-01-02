@@ -52,6 +52,8 @@ export async function POST(request: Request) {
     }
 
     // Create material with potential relationships
+    console.log(json);
+    console.log("sent json");
     const material = await prisma.$transaction(async (tx) => {
       // Create the base material
       const newMaterial = await tx.material.create({
@@ -60,10 +62,11 @@ export async function POST(request: Request) {
           color: json.color,
           colorCode: json.colorCode,
           brand: json.brand,
-          // defaultUnit: json.defaultUnit,
-          // defaultCostPerUnit: parseFloat(json.defaultCostPerUnit),
-          // currency: json.currency,
+          defaultUnit: json.unit,
+          defaultCostPerUnit: parseFloat(json.costPerUnit),
+          currency: json.currency,
           notes: json.notes || null,
+          properties: json.properties || null,
         },
       });
 

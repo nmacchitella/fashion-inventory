@@ -1,7 +1,8 @@
 "use client";
 
 import { DataTable, type DataTableColumn } from "@/components/data-table";
-import { UpsertDialog } from "@/components/forms/upsert-dialog"; // Our generic create/edit dialog
+import { UpsertDialog } from "@/components/forms/upsert-dialog";
+import { Notes } from "@/components/notes";
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
@@ -10,20 +11,6 @@ import { Plus } from "lucide-react";
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
-const materialFields = [
-  { key: "type", label: "Type", type: "text", required: true },
-  { key: "color", label: "Color", type: "text" },
-  { key: "colorCode", label: "Color Code", type: "text" },
-  { key: "brand", label: "Brand", type: "text" },
-  { key: "quantity", label: "Quantity", type: "number" },
-  { key: "unit", label: "Unit", type: "text" },
-  { key: "costPerUnit", label: "Cost Per Unit", type: "number" },
-  { key: "currency", label: "Currency", type: "text" },
-  { key: "location", label: "Location", type: "text" },
-  { key: "Properties", label: "Properties", type: "textarea" },
-];
-
-// Fetch the material from the API:
 async function fetchMaterial(materialId: string) {
   try {
     const response = await fetch(`/api/materials/${materialId}`);
@@ -44,11 +31,12 @@ export default function MaterialPage({
   params: Promise<{ materialId: string }>;
 }) {
   const router = useRouter();
-  const resolvedParams = use(params); // Resolve the promise for the 'materialId'
+  const resolvedParams = use(params);
   const [material, setMaterial] = useState<Material | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  // Load material when the page mounts or materialId changes
+  const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(
+    null
+  );
   useEffect(() => {
     fetchMaterial(resolvedParams.materialId).then(setMaterial);
   }, [resolvedParams.materialId]);
@@ -57,61 +45,145 @@ export default function MaterialPage({
     return <div>Loading...</div>;
   }
 
-  // Prepare detail items for <DetailsView>
-  console.log(material);
   const detailItems = [
     {
+      label: "Color",
+      value: material.color,
+      key: "color",
+      editable: true,
+    },
+    {
+      label: "Color Code",
+      value: material.colorCode,
+      key: "colorCode",
+      editable: true,
+    },
+    {
       label: "Brand",
-      value: material.brand, // Make sure this is a string
+      value: material.brand,
       key: "brand",
       editable: true,
     },
     {
       label: "Type",
-      value: material.type, // Make sure this is a string
+      value: material.type,
       key: "type",
       editable: true,
     },
     {
       label: "Cost Per Unit",
-      value: material.defaultCostPerUnit, // This should be a number
-      key: "costPerUnit",
+      value: material.defaultCostPerUnit,
+      key: "defaultCostPerUnit",
+      type: "number",
+      editable: true,
+    },
+    {
+      label: "Unit",
+      value: material.defaultUnit,
+      key: "defaultUnit",
+      type: "number",
+      editable: true,
+    },
+    {
+      label: "Currency",
+      value: material.currency,
+      key: "currency",
       type: "number",
       editable: true,
     },
   ];
 
-  // -- Column definitions --
+  const inventoryFields = [
+    { key: "quantity", label: "Quantity", type: "number", required: true },
+    {
+      key: "unit",
+      label: "Unit",
+      type: "select",
+      required: true,
+      options: [
+        { label: "Gram", value: "GRAM" },
+        { label: "Kilogram", value: "KILOGRAM" },
+        { label: "Meter", value: "METER" },
+        { label: "Yard", value: "YARD" },
+        { label: "Unit", value: "UNIT" },
+      ],
+    },
+    { key: "location", label: "Location", type: "text", required: true },
+    { key: "notes", label: "Notes", type: "textarea" },
+  ];
+
+  const inventoryDefaultData = {
+    quantity: 0.0,
+    unit: "GRAM",
+    location: "",
+    notes: "",
+    type: "MATERIAL",
+    // materialId specified below
+  };
+
+  if (material.properties) {
+    Object.entries(material.properties).forEach(([key, propertyData]) => {
+      detailItems.push({
+        label: propertyData.label,
+        value: propertyData.value,
+        key: `properties.${key}`,
+        type: propertyData.type || "string",
+        editable: true,
+      });
+    });
+  }
 
   const inventoryColumns: DataTableColumn<Inventory>[] = [
     {
+      id: "quantity",
       header: "Quantity",
       accessorKey: "quantity",
       cell: (inventory) => `${inventory.quantity} ${inventory.unit}`,
     },
-    { header: "Location", accessorKey: "location" },
+    {
+      id: "location",
+      header: "Location",
+      accessorKey: "location",
+    },
   ];
 
   const productsColumns: DataTableColumn<Inventory>[] = [
     {
+      id: "model",
       header: "Model",
       accessorKey: "name",
-      cell: (product) => `${product.product.name}`,
+      cell: (inventory) => inventory.product?.name ?? "",
     },
     {
+      id: "season",
       header: "Season",
       accessorKey: "season",
-      cell: (product) => `${product.product.season}`,
+      cell: (inventory) => inventory.product?.season ?? "",
     },
   ];
 
-  // Called after a successful PATCH (edit):
   const handleSaveSuccess = (updatedMaterial: Material) => {
+    console.log("saved success");
     setMaterial(updatedMaterial);
     setIsEditDialogOpen(false);
   };
 
-  // Called when the user clicks Delete
+  const handleSaveInventorySuccess = (newInventory: Inventory) => {
+    if (!material) return;
+    setMaterial({
+      ...material,
+      inventory: [...material.inventory, newInventory],
+    });
+    setIsEditDialogOpen(false);
+  };
+
+  const handleEditInventory = (inventory: Inventory) => {
+    console.log("entering", inventory);
+    setIsEditDialogOpen(true);
+    setSelectedInventory(inventory);
+    return;
+  };
+
   const handleDelete = async (id: string) => {
     try {
       const response = await fetch(`/api/materials/${id}`, {
@@ -120,7 +192,6 @@ export default function MaterialPage({
       if (!response.ok) {
         throw new Error("Failed to delete material");
       }
-      // Go back to the materials list
       router.push("/inventory/materials");
       router.refresh();
     } catch (error) {
@@ -128,28 +199,36 @@ export default function MaterialPage({
     }
   };
 
+  const handleAddInventory = () => {
+    setSelectedInventory(null);
+    setIsEditDialogOpen(true);
+  };
+
   return (
     <>
-      {/* Page Header */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">
-            {material.colorCode} - {material.color}
+            {material.color} - {material.colorCode}
           </h1>
           <div className="flex gap-2">
-            {/* <button
-              onClick={() => setIsEditDialogOpen(true)}
-              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
-            >
-              Edit
-            </button> */}
             <BackButton />
           </div>
         </div>
 
         <DetailsView
-          title=""
+          onSave={handleSaveSuccess}
           items={detailItems}
+          apiEndpoint="/api/materials"
+          itemId={material.id}
+          allowCustomFields={true} // Enable custom fields for materials
+        />
+      </div>
+
+      <div className="mt-2">
+        <Notes
+          initialNotes={material.notes}
+          onSuccess={handleSaveSuccess}
           apiEndpoint="/api/materials"
           itemId={material.id}
         />
@@ -162,8 +241,7 @@ export default function MaterialPage({
             <button
               className="p-1 hover:bg-gray-100 rounded-full"
               title="Add new inventory item"
-              // onClick={() => console.log("Add new inventory clicked")}
-              onClick={() => setIsEditDialogOpen(true)}
+              onClick={handleAddInventory}
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -172,46 +250,48 @@ export default function MaterialPage({
           <DataTable
             data={material.inventory}
             columns={inventoryColumns}
-            viewPath="/inventory" // Assuming the details path for inventory items
+            viewPath="/inventory"
+            onUpdate={handleEditInventory}
           />
         </div>
         <div className="">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-1xl font-bold">Product</h2>
-            <button
+            <h2 className="text-1xl font-bold">Used in Products</h2>
+            {/* <button
               className="p-1 hover:bg-gray-100 rounded-full"
               title="Add new inventory item"
               onClick={() => console.log("Add new inventory clicked")}
             >
               <Plus className="w-5 h-5" />
-            </button>
+            </button> */}
           </div>
 
           <DataTable
             data={material.products}
             columns={productsColumns}
-            viewPath="/inventory" // Assuming the details path for inventory items
+            viewPath="/inventory"
           />
         </div>
       </div>
-
-      {/* Our UpsertDialog for editing the material */}
       {isEditDialogOpen && (
         <DialogComponent
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
-          title="Edit Material"
+          title="Add Inventory"
         >
           <UpsertDialog
             open={isEditDialogOpen}
             onOpenChange={setIsEditDialogOpen}
-            onSuccess={handleSaveSuccess}
-            defaultData={material}
-            fields={materialFields}
-            apiEndpoint="/api/materials"
-            itemName="Material"
-            mode="edit"
-            onDeleteSuccess={(item) => handleDelete(item.id!)}
+            onSuccess={handleSaveInventorySuccess}
+            apiEndpoint="/api/inventory"
+            fields={inventoryFields}
+            defaultData={{
+              ...inventoryDefaultData,
+              ...selectedInventory,
+              materialId: material.id,
+            }}
+            mode="create"
+            itemName="inventory"
           />
         </DialogComponent>
       )}

@@ -1,27 +1,28 @@
 // app/inventory/page.tsx
+import { Package, Volleyball } from "lucide-react";
 import Link from "next/link";
 
 export default function InventoryPage() {
   const inventories = [
     {
       title: "Materials",
-      description: "Track our current material inventory.",
+      description: "Track current material inventory.",
       href: "/inventory/materials",
-      icon: "📦", // We can replace this with a proper icon
-      stats: {
-        active: 5, // These could be real numbers from your DB
-        pending: 2,
-      },
+      IconComponent: Volleyball, // Store the component itself
+      // stats: {
+      //   active: 5,
+      //   pending: 2,
+      // },
     },
     {
       title: "Products",
-      description: "Track our current product inventory.",
+      description: "Track current product inventory.",
       href: "/inventory/products",
-      icon: "📦", // We can replace this with a proper icon
-      stats: {
-        active: 5, // These could be real numbers from your DB
-        pending: 2,
-      },
+      IconComponent: Package,
+      // stats: {
+      //   active: 5,
+      //   pending: 2,
+      // },
     },
   ];
 
@@ -39,14 +40,16 @@ export default function InventoryPage() {
             className="block p-6 bg-white rounded-lg border hover:shadow-lg transition-shadow"
           >
             <div className="flex items-center space-x-4">
-              <div className="text-2xl">{inventory.icon}</div>
+              <div className="text-2xl">
+                <inventory.IconComponent className="w-8 h-8 text-blue-600" />
+              </div>
               <div>
                 <h3 className="text-lg font-semibold">{inventory.title}</h3>
                 <p className="text-sm text-gray-500">{inventory.description}</p>
               </div>
             </div>
 
-            {inventory.stats && (
+            {/* {inventory.stats && (
               <div className="mt-4 flex space-x-4">
                 <div className="text-sm">
                   <span className="font-medium text-green-600">
@@ -61,7 +64,7 @@ export default function InventoryPage() {
                   <span className="text-gray-500"> pending</span>
                 </div>
               </div>
-            )}
+            )} */}
           </Link>
         ))}
       </div>

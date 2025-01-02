@@ -7,11 +7,11 @@ import { NextResponse } from "next/server";
 //
 export async function GET(
   request: Request,
-  context: { params: { materialId: string } }
+  { params }: { params: { materialId: string } }
 ) {
   try {
-    // Destructure materialId from context.params
-    const { materialId } = context.params;
+    // Now you can destructure directly without awaiting
+    const { materialId } = params;
 
     // No request.json() for GET — remove that part entirely
     console.log("GET request for material:", materialId);
@@ -91,21 +91,19 @@ export async function PATCH(
     }
 
     console.log(json);
+    const dataToUpdate = {
+      ...json,
+      inventory: undefined,
+      products: undefined,
+    };
 
     // Update material using transaction to ensure data consistency
     const updatedMaterial = await prisma.$transaction(async (tx) => {
+      console.log("preparing to update");
+      console.log("Actual data sent to Prisma:", dataToUpdate);
       const material = await tx.material.update({
         where: { id: materialId },
-        data: {
-          // Spread the json but explicitly remove relations to prevent unintended updates
-          ...json,
-          inventory: undefined,
-          products: undefined,
-          // Convert string values to numbers where needed
-          defaultCostPerUnit: json.defaultCostPerUnit
-            ? parseFloat(json.defaultCostPerUnit)
-            : undefined,
-        },
+        data: dataToUpdate,
         include: {
           inventory: {
             include: {
@@ -119,11 +117,11 @@ export async function PATCH(
           },
         },
       });
-      console.log("done");
+      console.log("done updating");
       return material;
     });
 
-    console.log("completing here");
+    console.log("completiiiiiiing here, repriting material");
 
     return NextResponse.json(updatedMaterial);
   } catch (error) {

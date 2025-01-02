@@ -60,7 +60,6 @@ export function UpsertDialog<T extends { id?: string }>({
       // For edit mode, append the ID to the endpoint
       const url =
         mode === "create" ? apiEndpoint : `${apiEndpoint}/${(data as T).id}`;
-      console.log(JSON.stringify(data));
       const response = await fetch(url, {
         method,
         headers: {

@@ -1,3 +1,5 @@
+// MaterialControls.tsx
+
 "use client";
 
 import { DataTable, type DataTableColumn } from "@/components/data-table";
@@ -18,17 +20,6 @@ const materialColumns: DataTableColumn<Material>[] = [
       </div>
     ),
   },
-  // {
-  //   header: "Quantity",
-  //   accessorKey: "defaultUnit",
-  //   cell: (material) => {
-  //     const inventory = material.inventory?.[0];
-  //     return inventory
-  //       ? `${inventory.quantity} ${inventory.unit}`
-  //       : "No inventory";
-  //   },
-  // },
-
   {
     header: "Cost",
     accessorKey: "defaultCostPerUnit",
@@ -39,26 +30,44 @@ const materialColumns: DataTableColumn<Material>[] = [
     header: "Properties",
     accessorKey: "properties",
     cell: (material) => {
-      return Object.keys(material.properties)
-        .map((key) => `${key}: ${material.properties[key]}`)
+      return Object.entries(material?.properties || {})
+        .map(([key, prop]) => `${key}: ${prop.value || ""}`)
         .join(", ");
     },
   },
 ];
 
 // Define the fields for the "edit form" inside your UpsertDialog
-// Adjust as needed for your material schema
-const materialFields = [
+const materialFields: FormField<Material>[] = [
   { key: "type", label: "Type", type: "text", required: true },
   { key: "color", label: "Color", type: "text" },
   { key: "colorCode", label: "Color Code", type: "text" },
   { key: "brand", label: "Brand", type: "text" },
-  { key: "quantity", label: "Quantity", type: "number" },
-  { key: "unit", label: "Unit", type: "text" },
   { key: "costPerUnit", label: "Cost Per Unit", type: "number" },
-  { key: "currency", label: "Currency", type: "text" },
-  { key: "location", label: "Location", type: "text" },
+  {
+    key: "unit",
+    label: "Unit",
+    type: "select",
+    options: [
+      { label: "Gram", value: "GRAM" },
+      { label: "Kilogram", value: "KILOGRAM" },
+      { label: "Meter", value: "METER" },
+      { label: "Yard", value: "YARD" },
+      { label: "Unit", value: "UNIT" },
+    ],
+  },
+  {
+    key: "currency",
+    label: "Currency",
+    type: "text",
+    options: [
+      { label: "USD", value: "USD" },
+      { label: "Euro", value: "EURO" },
+    ],
+  },
   { key: "notes", label: "Notes", type: "textarea" },
+  // Add the properties field
+  { key: "properties", label: "Properties", type: "keyValue" },
 ];
 
 // Default data for creating a brand-new material
@@ -67,8 +76,8 @@ const defaultMaterial: Partial<Material> = {
   color: "",
   colorCode: "",
   brand: "",
-  defaultCostPerUnit: 0,
   currency: "USD",
+  properties: {},
 };
 
 interface MaterialControlsProps {
@@ -86,14 +95,14 @@ export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
     null
   );
 
-  //Create
+  // Create
   const handleCreate = () => {
     setDialogMode("create");
     setSelectedMaterial(null);
     setIsDialogOpen(true);
   };
 
-  //After a successful save (create or edit)
+  // After a successful save (create or edit)
   const handleSaveSuccess = (upserted: Material) => {
     setMaterials((prev) => {
       // If we're updating an existing material, replace it
@@ -126,7 +135,7 @@ export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
     }
   };
 
-  //Edit
+  // Edit
   const handleUpdate = (material: Material) => {
     // We'll open the dialog in edit mode with the selected material
     setDialogMode("edit");
@@ -150,6 +159,7 @@ export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
       <DataTable
         data={materials}
         columns={materialColumns}
+        // Uncomment and implement these handlers as needed
         // onDelete={handleDelete} // Called when user clicks "Delete" in a row
         // onUpdate={handleUpdate} // Called when user clicks "Edit" in a row
         viewPath="/inventory/materials"

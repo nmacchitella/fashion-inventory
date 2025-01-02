@@ -8,7 +8,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -20,7 +24,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -32,7 +40,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -44,7 +56,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -56,7 +72,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -68,7 +88,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -80,7 +104,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -92,7 +120,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -104,7 +136,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -116,7 +152,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x4x4"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x4x4",
+        "type": "string"
+      }
     }
   },
   {
@@ -128,7 +168,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -140,7 +184,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -152,7 +200,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -164,7 +216,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -176,7 +232,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -188,7 +248,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -200,7 +264,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -212,7 +280,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -224,7 +296,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   },
   {
@@ -236,7 +312,11 @@
     "defaultCostPerUnit": 32,
     "currency": "EUR",
     "properties": {
-      "thread": "30/2x5x2"
+      "thread": {
+        "label": "thread",
+        "value": "30/2x5x2",
+        "type": "string"
+      }
     }
   }
 ]

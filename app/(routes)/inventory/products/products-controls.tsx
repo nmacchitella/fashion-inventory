@@ -151,8 +151,8 @@ export function ProductsControls({ initialProducts }: ProductsControlsProps) {
       <DataTable
         data={products}
         columns={productColumns}
-        onDelete={handleDelete}
-        onUpdate={handleUpdate}
+        // onDelete={handleDelete}
+        // onUpdate={handleUpdate}
         viewPath="/inventory/products"
       />
 

@@ -4,6 +4,14 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useState } from "react";
 
+interface FormField<T> {
+  key: keyof T | "properties";
+  label: string;
+  type: "text" | "number" | "select" | "textarea" | "keyValue";
+  options?: { label: string; value: string }[];
+  required?: boolean;
+}
+
 interface EditFormProps<T> {
   mode?: "edit" | "create";
   initialData: T;
@@ -11,14 +19,6 @@ interface EditFormProps<T> {
   onSaveSuccess: (updatedData: T | Partial<T>) => void;
   onDeleteSuccess?: (id: string) => Promise<void>;
   onCancel: () => void;
-}
-
-interface FormField<T> {
-  key: keyof T;
-  label: string;
-  type: "text" | "number" | "select" | "textarea";
-  options?: string[];
-  required?: boolean;
 }
 
 export function EditForm<T extends { id?: string }>({
@@ -35,13 +35,56 @@ export function EditForm<T extends { id?: string }>({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // State for dynamic properties
+  const [properties, setProperties] = useState<
+    { key: string; value: string }[]
+  >(
+    Object.entries((initialData as any).properties || {}).map(
+      ([key, value]) => ({
+        key,
+        value: String(value),
+      })
+    )
+  );
+
+  const handleAddProperty = () => {
+    setProperties([...properties, { key: "", value: "" }]);
+  };
+
+  const handleRemoveProperty = (index: number) => {
+    setProperties(properties.filter((_, i) => i !== index));
+  };
+
+  const handlePropertyChange = (
+    index: number,
+    field: "key" | "value",
+    value: string
+  ) => {
+    const updated = [...properties];
+    updated[index][field] = value;
+    setProperties(updated);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      // We'll rely on the parent to do the actual API call
-      // onSaveSuccess can return the newly created/updated item
-      await onSaveSuccess(formData);
+      // Merge properties into formData
+      const mergedData = {
+        ...formData,
+        properties: properties.reduce((acc, prop) => {
+          if (prop.key.trim() !== "") {
+            acc[prop.key] = {
+              label: prop.key,
+              value: prop.value,
+              type: "string",
+            };
+          }
+          return acc;
+        }, {} as Record<string, any>),
+      };
+
+      await onSaveSuccess(mergedData);
       showToast(
         `Item ${mode === "create" ? "created" : "updated"} successfully`,
         "success"
@@ -78,58 +121,108 @@ export function EditForm<T extends { id?: string }>({
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          {fields.map((field) => (
-            <div key={String(field.key)} className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                {field.label}
-              </label>
-              {field.type === "select" ? (
-                <select
-                  value={String(formData[field.key] || "")}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      [field.key]: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 border rounded-md"
-                  required={field.required}
-                >
-                  {field.options?.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
+          {fields.map((field) => {
+            if (field.type === "keyValue") {
+              return (
+                <div key="properties" className="col-span-2 space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    {field.label}
+                  </label>
+                  {properties.map((prop, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        placeholder="Key"
+                        value={prop.key}
+                        onChange={(e) =>
+                          handlePropertyChange(index, "key", e.target.value)
+                        }
+                        className="w-1/3 px-3 py-2 border rounded-md"
+                        required
+                      />
+                      <input
+                        type="text"
+                        placeholder="Value"
+                        value={prop.value}
+                        onChange={(e) =>
+                          handlePropertyChange(index, "value", e.target.value)
+                        }
+                        className="w-2/3 px-3 py-2 border rounded-md"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveProperty(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        &times;
+                      </button>
+                    </div>
                   ))}
-                </select>
-              ) : field.type === "textarea" ? (
-                <textarea
-                  value={String(formData[field.key] || "")}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      [field.key]: e.target.value,
-                    }))
-                  }
-                  rows={3}
-                  className="w-full px-3 py-2 border rounded-md"
-                  required={field.required}
-                />
-              ) : (
-                <input
-                  type={field.type}
-                  value={String(formData[field.key] || "")}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      [field.key]: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 border rounded-md"
-                  required={field.required}
-                />
-              )}
-            </div>
-          ))}
+                  <button
+                    type="button"
+                    onClick={handleAddProperty}
+                    className="mt-2 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                  >
+                    Add Property
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <div key={String(field.key)} className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  {field.label}
+                </label>
+                {field.type === "select" ? (
+                  <select
+                    value={String(formData[field.key] || "")}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        [field.key]: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border rounded-md"
+                    required={field.required}
+                  >
+                    <option value="">Select {field.label}</option>
+                    {field.options?.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : field.type === "textarea" ? (
+                  <textarea
+                    value={String(formData[field.key] || "")}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        [field.key]: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 border rounded-md"
+                    required={field.required}
+                  />
+                ) : (
+                  <input
+                    type={field.type}
+                    value={String(formData[field.key] || "")}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        [field.key]: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border rounded-md"
+                    required={field.required}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Footer buttons */}

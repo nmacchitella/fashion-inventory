@@ -11,6 +11,7 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  password  String // New field for authentication
   name      String?
   role      Role     @default(USER)
   createdAt DateTime @default(now())
