@@ -4,7 +4,7 @@ import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const MaterialSelector = ({
-  productId,
+  // productId,
   onSelect,
   open,
   onOpenChange,

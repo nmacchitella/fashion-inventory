@@ -216,4 +216,12 @@ export type ProductWithRelations = Product & {
   })[];
 };
 
+export type FormFieldType = "text" | "number" | "select" | "textarea";
 
+export type FormField<T> = {
+  key: keyof T | keyof BaseEntity;
+  label: string;
+  type: FormFieldType;
+  required?: boolean;
+  options?: string[];
+};

@@ -136,12 +136,12 @@ export function MaterialControls({ initialMaterials }: MaterialControlsProps) {
   };
 
   // Edit
-  const handleUpdate = (material: Material) => {
-    // We'll open the dialog in edit mode with the selected material
-    setDialogMode("edit");
-    setSelectedMaterial(material);
-    setIsDialogOpen(true);
-  };
+  // const handleUpdate = (material: Material) => {
+  //   // We'll open the dialog in edit mode with the selected material
+  //   setDialogMode("edit");
+  //   setSelectedMaterial(material);
+  //   setIsDialogOpen(true);
+  // };
 
   // --- Render ---
   return (

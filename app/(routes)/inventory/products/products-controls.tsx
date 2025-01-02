@@ -89,29 +89,29 @@ export function ProductsControls({ initialProducts }: ProductsControlsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // -- Deleting a product --
-  const handleDelete = async (productId: string) => {
-    try {
-      const response = await fetch(`/api/products/${productId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to delete product");
-      }
-      // Remove the product from local state:
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      throw error;
-    }
-  };
+  // const handleDelete = async (productId: string) => {
+  //   try {
+  //     const response = await fetch(`/api/products/${productId}`, {
+  //       method: "DELETE",
+  //     });
+  //     if (!response.ok) {
+  //       const errorData = await response.json().catch(() => ({}));
+  //       throw new Error(errorData.error || "Failed to delete product");
+  //     }
+  //     // Remove the product from local state:
+  //     setProducts((prev) => prev.filter((p) => p.id !== productId));
+  //   } catch (error) {
+  //     console.error("Error deleting product:", error);
+  //     throw error;
+  //   }
+  // };
 
   // -- Editing an existing product --
-  const handleUpdate = (product: Product) => {
-    setDialogMode("edit");
-    setSelectedProduct(product);
-    setIsDialogOpen(true);
-  };
+  // const handleUpdate = (product: Product) => {
+  //   setDialogMode("edit");
+  //   setSelectedProduct(product);
+  //   setIsDialogOpen(true);
+  // };
 
   // -- Creating a new product --
   const handleCreate = () => {

@@ -1,13 +1,10 @@
 // app/api/contacts/[contactId]/route.ts
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: { contactId: string } }
-) {
+export async function GET(request: NextRequest, context) {
   try {
-    const contactId = params.contactId;
+    const { contactId } = context.params;
 
     const contact = await prisma.contact.findUnique({
       where: {
@@ -29,13 +26,10 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { contactId: string } }
-) {
+export async function PATCH(request: NextRequest, context) {
   try {
     const json = await request.json();
-    const contactId = params.contactId;
+    const { contactId } = context.params;
 
     // Ensure the contact exists first
     const existingContact = await prisma.contact.findUnique({
@@ -101,12 +95,9 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: { contactId: string } }
-) {
+export async function DELETE(request: NextRequest, context) {
   try {
-    const contactId = params.contactId;
+    const { contactId } = context.params;
 
     console.log("Attempting to delete contact:", contactId);
 

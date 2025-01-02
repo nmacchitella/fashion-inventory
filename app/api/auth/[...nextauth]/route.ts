@@ -60,7 +60,7 @@ const handler = NextAuth({
             name: user.name,
           };
         } catch (error) {
-          // console.error("Detailed auth error:", error);
+          console.error("Detailed auth error:", error);
           throw new Error("Authentication failed");
         }
       },

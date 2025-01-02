@@ -12,7 +12,7 @@ import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 // Example of the same product form fields you used in ProductsControls:
-export const inventoryFields = [
+const inventoryFields = [
   {
     key: "quantity",
     label: "Quantity",
@@ -45,7 +45,7 @@ export const inventoryFields = [
   // },
 ];
 
-export const materialFields = [
+const materialFields = [
   {
     key: "type",
     label: "Material Type",
@@ -151,22 +151,22 @@ export default function ProductPage({
   }
 
   // PHASE color styling (same helper as before)
-  function getPhaseColor(phase: string) {
-    switch (phase) {
-      case "SWATCH":
-        return "bg-blue-100 text-blue-800";
-      case "INITIAL_SAMPLE":
-        return "bg-yellow-100 text-yellow-800";
-      case "FIT_SAMPLE":
-        return "bg-purple-100 text-purple-800";
-      case "PRODUCTION_SAMPLE":
-        return "bg-orange-100 text-orange-800";
-      case "PRODUCTION":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  }
+  // function getPhaseColor(phase: string) {
+  //   switch (phase) {
+  //     case "SWATCH":
+  //       return "bg-blue-100 text-blue-800";
+  //     case "INITIAL_SAMPLE":
+  //       return "bg-yellow-100 text-yellow-800";
+  //     case "FIT_SAMPLE":
+  //       return "bg-purple-100 text-purple-800";
+  //     case "PRODUCTION_SAMPLE":
+  //       return "bg-orange-100 text-orange-800";
+  //     case "PRODUCTION":
+  //       return "bg-green-100 text-green-800";
+  //     default:
+  //       return "bg-gray-100 text-gray-800";
+  //   }
+  // }
 
   // Items for our DetailsView
   const detailItems = [
@@ -241,9 +241,9 @@ export default function ProductPage({
     setDialogState({ open: false });
   };
 
-  const handleAddMaterial = () => {
-    setDialogState({ open: true, item: "Material", mode: "create" });
-  };
+  // const handleAddMaterial = () => {
+  //   setDialogState({ open: true, item: "Material", mode: "create" });
+  // };
 
   const handleAddInventory = () => {
     setDialogState({ open: true, item: "Inventory", mode: "create" });

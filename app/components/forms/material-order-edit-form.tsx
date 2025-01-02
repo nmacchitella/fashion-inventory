@@ -75,7 +75,7 @@ export function MaterialOrderEditForm({
     };
 
     fetchMaterials();
-  }, []);
+  }, [showToast]);
 
   // New state for stepped selection
   const [selectedBrand, setSelectedBrand] = useState("");

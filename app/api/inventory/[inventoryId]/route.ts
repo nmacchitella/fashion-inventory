@@ -1,16 +1,14 @@
+// app/api/inventory/[inventoryId]/route.ts
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-//
-// GET /api/inventory/[inventoryId]
-// Fetch a single inventory item by ID
-//
-export async function GET(
-  request: Request,
-  { params }: { params: { inventoryId: string } }
-) {
+/**
+ * GET /api/inventory/[inventoryId]
+ * Fetch a single inventory item by ID
+ */
+export async function GET(request: NextRequest, context) {
   try {
-    const { inventoryId } = params;
+    const { inventoryId } = context.params;
 
     const inventoryItem = await prisma.inventory.findUnique({
       where: { id: inventoryId },
@@ -38,16 +36,13 @@ export async function GET(
   }
 }
 
-//
-// PATCH /api/inventory/[inventoryId]
-// Update an existing inventory item
-//
-export async function PATCH(
-  request: Request,
-  { params }: { params: { inventoryId: string } }
-) {
+/**
+ * PATCH /api/inventory/[inventoryId]
+ * Update an existing inventory item
+ */
+export async function PATCH(request: NextRequest, context) {
   try {
-    const { inventoryId } = params;
+    const { inventoryId } = context.params;
     const json = await request.json();
 
     // Ensure this inventory record exists
@@ -64,13 +59,14 @@ export async function PATCH(
 
     // Build a partial update object
     const dataToUpdate: any = {};
-    if (json.quantity !== undefined) dataToUpdate.quantity = parseFloat(json.quantity);
+    if (json.quantity !== undefined)
+      dataToUpdate.quantity = parseFloat(json.quantity);
     if (json.unit !== undefined) dataToUpdate.unit = json.unit;
     if (json.location !== undefined) dataToUpdate.location = json.location;
     if (json.notes !== undefined) dataToUpdate.notes = json.notes;
 
-    // Could also handle "type" changes, "materialId"/"productId" changes, etc. if needed
-    // Just be sure to validate that logic carefully.
+    // Optional: Handle "type" changes, "materialId"/"productId" changes, etc.
+    // Ensure to validate these changes as needed.
 
     const updatedItem = await prisma.inventory.update({
       where: { id: inventoryId },
@@ -92,16 +88,13 @@ export async function PATCH(
   }
 }
 
-//
-// DELETE /api/inventory/[inventoryId]
-// Delete an inventory item if it has no movements
-//
-export async function DELETE(
-  request: Request,
-  { params }: { params: { inventoryId: string } }
-) {
+/**
+ * DELETE /api/inventory/[inventoryId]
+ * Delete an inventory item if it has no movements
+ */
+export async function DELETE(request: NextRequest, context) {
   try {
-    const { inventoryId } = params;
+    const { inventoryId } = context.params;
 
     const existingItem = await prisma.inventory.findUnique({
       where: { id: inventoryId },
@@ -125,7 +118,7 @@ export async function DELETE(
       );
     }
 
-    // Delete
+    // Delete the inventory item
     await prisma.inventory.delete({
       where: { id: inventoryId },
     });

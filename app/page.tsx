@@ -1,18 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+// import { useRouter } from "next/navigation";
+import { useState } from "react"; // useEffect,
 
 export default function Home() {
-  const router = useRouter();
+  // const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
- 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,6 +28,7 @@ export default function Home() {
         setError(result.error);
       }
     } catch (error) {
+      console.log(error);
       setError("An unexpected error occurred");
     } finally {
       setIsLoading(false);

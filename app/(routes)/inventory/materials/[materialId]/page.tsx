@@ -8,7 +8,7 @@ import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
 import { Inventory, Material } from "@/types/types";
 import { Plus } from "lucide-react";
-import { notFound, useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 async function fetchMaterial(materialId: string) {
@@ -30,7 +30,7 @@ export default function MaterialPage({
 }: {
   params: Promise<{ materialId: string }>;
 }) {
-  const router = useRouter();
+  // const router = useRouter();
   const resolvedParams = use(params);
   const [material, setMaterial] = useState<Material | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -184,20 +184,20 @@ export default function MaterialPage({
     return;
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      const response = await fetch(`/api/materials/${id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to delete material");
-      }
-      router.push("/inventory/materials");
-      router.refresh();
-    } catch (error) {
-      console.error("Error deleting material:", error);
-    }
-  };
+  // const handleDelete = async (id: string) => {
+  //   try {
+  //     const response = await fetch(`/api/materials/${id}`, {
+  //       method: "DELETE",
+  //     });
+  //     if (!response.ok) {
+  //       throw new Error("Failed to delete material");
+  //     }
+  //     router.push("/inventory/materials");
+  //     router.refresh();
+  //   } catch (error) {
+  //     console.error("Error deleting material:", error);
+  //   }
+  // };
 
   const handleAddInventory = () => {
     setSelectedInventory(null);

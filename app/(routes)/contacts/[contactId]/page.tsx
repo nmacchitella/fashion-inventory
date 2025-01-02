@@ -4,13 +4,15 @@ import { UpsertDialog } from "@/components/forms/upsert-dialog";
 import { BackButton } from "@/components/ui/back-button";
 import { DetailsView } from "@/components/ui/details-view";
 import { DialogComponent } from "@/components/ui/dialog";
-import { Contact } from "@/types/types";
+import { Contact, FormField } from "@/types/types";
 import { notFound, useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 // Example contact form fields for your UpsertDialog
 // Adjust to match your contact schema
-const contactFields = [
+
+// @ts-ignore
+const contactFields: FormField<Contact>[] = [
   { key: "name", label: "Name", type: "text", required: true },
   { key: "email", label: "Email", type: "text", required: true },
   { key: "phone", label: "Phone", type: "text" },
@@ -104,12 +106,17 @@ export default function ContactPage({
 
   // Prepare data for the <DetailsView>
   const detailItems = [
-    { label: "Name", value: contact.name },
-    { label: "Email", value: contact.email },
-    { label: "Phone", value: contact.phone || "Not provided" },
-    { label: "Company", value: contact.company || "Not provided" },
-    { label: "Role", value: contact.role || "Not provided" },
+    { key: "name", label: "Name", value: contact.name },
+    { key: "email", label: "Email", value: contact.email },
+    { key: "phone", label: "Phone", value: contact.phone || "Not provided" },
     {
+      key: "company",
+      label: "Company",
+      value: contact.company || "Not provided",
+    },
+    { key: "role", label: "Role", value: contact.role || "Not provided" },
+    {
+      key: "type",
       label: "Type",
       value: (
         <span
@@ -121,12 +128,14 @@ export default function ContactPage({
         </span>
       ),
     },
-    { label: "Notes", value: contact.notes || "No notes" },
+    { key: "notes", label: "Notes", value: contact.notes || "No notes" },
     {
+      key: "createdAt",
       label: "Created At",
       value: new Date(contact.createdAt).toLocaleDateString(),
     },
     {
+      key: "updatedAt",
       label: "Updated At",
       value: new Date(contact.updatedAt).toLocaleDateString(),
     },
@@ -166,7 +175,7 @@ export default function ContactPage({
             onOpenChange={setIsEditDialogOpen}
             onSuccess={handleSaveSuccess}
             defaultData={contact}
-            fields={contactFields}
+            fields={contactFields as FormField<Contact>[]}
             apiEndpoint="/api/contacts"
             itemName="Contact"
             // So the dialog's Delete button calls handleDelete

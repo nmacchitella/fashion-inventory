@@ -2,7 +2,7 @@
 
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { UpsertDialog } from "@/components/forms/upsert-dialog"; // same generic dialog used by products/materials
-import { Contact } from "@/types/types";
+import { Contact, ContactType, FormField } from "@/types/types";
 import { useState } from "react";
 
 const contactColumns: DataTableColumn<Contact>[] = [
@@ -14,10 +14,12 @@ const contactColumns: DataTableColumn<Contact>[] = [
 ];
 
 // Define the fields for the dialog’s edit form:
-const contactFields = [
+const contactFields: FormField<Contact>[] = [
   { key: "name", label: "Name", type: "text", required: true },
   { key: "email", label: "Email", type: "text", required: true },
   { key: "phone", label: "Phone", type: "text" },
+  { key: "company", label: "Company", type: "text" },
+  { key: "role", label: "Role", type: "text" },
   {
     key: "type",
     label: "Type",
@@ -25,7 +27,6 @@ const contactFields = [
     options: ["SUPPLIER", "MANUFACTURER", "CUSTOMER"],
     required: true,
   },
-  { key: "company", label: "Company", type: "text" },
   { key: "notes", label: "Notes", type: "textarea" },
 ];
 
@@ -34,7 +35,7 @@ const defaultContact: Partial<Contact> = {
   name: "",
   email: "",
   phone: "",
-  type: "CUSTOMER", // or "" if you want no default
+  type: ContactType.CUSTOMER, // or "" if you want no default
   company: "",
   notes: "",
 };

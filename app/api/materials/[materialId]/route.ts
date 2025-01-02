@@ -1,19 +1,15 @@
 // app/api/materials/[materialId]/route.ts
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-//
-// GET /api/materials/[materialId]
-//
-export async function GET(
-  request: Request,
-  { params }: { params: { materialId: string } }
-) {
+/**
+ * GET /api/materials/[materialId]
+ * Fetch a single material by ID
+ */
+export async function GET(request: NextRequest, context) {
   try {
-    // Now you can destructure directly without awaiting
-    const { materialId } = params;
+    const { materialId } = context.params;
 
-    // No request.json() for GET — remove that part entirely
     console.log("GET request for material:", materialId);
 
     const material = await prisma.material.findUnique({
@@ -51,15 +47,16 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { materialId: string } }
-) {
+/**
+ * PATCH /api/materials/[materialId]
+ * Update an existing material
+ */
+export async function PATCH(request: NextRequest, context) {
   try {
-    // 1. Await the request body
+    const { materialId } = context.params;
     const json = await request.json();
 
-    // 2. Validate the payload
+    // Validate the payload
     if (!json) {
       return NextResponse.json(
         { error: "Request body is required" },
@@ -69,16 +66,7 @@ export async function PATCH(
 
     console.log("Received data:", json);
 
-    // 3. Get and validate materialId
-    const { materialId } = params;
-    if (!materialId) {
-      return NextResponse.json(
-        { error: "Material ID is required" },
-        { status: 400 }
-      );
-    }
-
-    // 4. Ensure the material exists first
+    // Ensure the material exists first
     const existingMaterial = await prisma.material.findUnique({
       where: { id: materialId },
     });
@@ -90,16 +78,18 @@ export async function PATCH(
       );
     }
 
-    console.log(json);
-    const dataToUpdate = {
+    // Build a partial update object
+    const dataToUpdate: Partial<typeof json> = {
       ...json,
-      inventory: undefined,
-      products: undefined,
+      inventory: undefined, // Exclude relations if necessary
+      products: undefined, // Exclude relations if necessary
     };
+
+    // Optional: Validate and sanitize dataToUpdate here
 
     // Update material using transaction to ensure data consistency
     const updatedMaterial = await prisma.$transaction(async (tx) => {
-      console.log("preparing to update");
+      console.log("Preparing to update material");
       console.log("Actual data sent to Prisma:", dataToUpdate);
       const material = await tx.material.update({
         where: { id: materialId },
@@ -117,11 +107,11 @@ export async function PATCH(
           },
         },
       });
-      console.log("done updating");
+      console.log("Material updated successfully");
       return material;
     });
 
-    console.log("completiiiiiiing here, repriting material");
+    console.log("Update transaction completed for material:", materialId);
 
     return NextResponse.json(updatedMaterial);
   } catch (error) {
@@ -136,12 +126,13 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: { materialId: string } }
-) {
+/**
+ * DELETE /api/materials/[materialId]
+ * Delete a material if it has no related inventory or products
+ */
+export async function DELETE(request: NextRequest, context) {
   try {
-    const materialId = params.materialId;
+    const { materialId } = context.params;
 
     console.log("Attempting to delete material:", materialId);
 
@@ -191,7 +182,7 @@ export async function DELETE(
 
     // Use transaction to ensure all related records are deleted properly
     await prisma.$transaction(async (tx) => {
-      // Delete all inventory records
+      // Delete all inventory records related to the material
       await tx.inventory.deleteMany({
         where: {
           materialId: materialId,
@@ -205,7 +196,7 @@ export async function DELETE(
         },
       });
 
-      // Finally delete the material
+      // Finally, delete the material itself
       await tx.material.delete({
         where: {
           id: materialId,
@@ -213,7 +204,10 @@ export async function DELETE(
       });
     });
 
-    console.log("Material and related records deleted successfully");
+    console.log(
+      "Material and related records deleted successfully:",
+      materialId
+    );
     return NextResponse.json({
       message: "Material deleted successfully",
       id: materialId,
