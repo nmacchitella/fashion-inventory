@@ -6,14 +6,13 @@ export default function OperationPage() {
     {
       title: "Prepare a Material Order",
       description: "Track and manage material orders and their status",
-      href: "/tools/material-order",
+      href: "/tools/calculate-materials",
       icon: "📦", // We can replace this with a proper icon
       stats: {
         active: 5, // These could be real numbers from your DB
         pending: 2,
       },
     },
-    
   ];
 
   return (
