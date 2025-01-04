@@ -72,6 +72,7 @@ const handler = NextAuth({
   session: {
     strategy: "jwt",
   },
+  secret: process.env.NEXTAUTH_SECRET,
   debug: false, // Changed this to false since we don't need debug logs anymore
 });
 
